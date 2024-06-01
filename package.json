@@ -1,6 +1,6 @@
 {
   "name": "capacitor-khipu",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Capacitor plugin for Khipu",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -43,7 +43,8 @@
     "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.js",
     "clean": "rimraf ./dist",
     "watch": "tsc --watch",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "release": "release-it"
   },
   "devDependencies": {
     "@capacitor/android": "^6.0.0",
@@ -56,6 +57,7 @@
     "eslint": "^7.11.0",
     "prettier": "~2.3.0",
     "prettier-plugin-java": "~1.0.2",
+    "release-it": "^17.3.0",
     "rimraf": "^3.0.2",
     "rollup": "^2.32.0",
     "swiftlint": "^1.0.1",
@@ -76,5 +78,6 @@
     "android": {
       "src": "android"
     }
-  }
+  },
+  "release-it": {}
 }
