@@ -132,13 +132,14 @@ startOperation(options: StartOperationOptions) => Promise<KhipuResult>
 
 #### KhipuOptions
 
-| Prop               | Type                                                |
-| ------------------ | --------------------------------------------------- |
-| **`locale`**       | <code>string</code>                                 |
-| **`title`**        | <code>string</code>                                 |
-| **`skipExitPage`** | <code>boolean</code>                                |
-| **`theme`**        | <code>'light' \| 'dark' \| 'system'</code>          |
-| **`colors`**       | <code><a href="#khipucolors">KhipuColors</a></code> |
+| Prop                | Type                                                |
+| ------------------- | --------------------------------------------------- |
+| **`locale`**        | <code>string</code>                                 |
+| **`title`**         | <code>string</code>                                 |
+| **`titleImageUrl`** | <code>string</code>                                 |
+| **`skipExitPage`**  | <code>boolean</code>                                |
+| **`theme`**         | <code>'light' \| 'dark' \| 'system'</code>          |
+| **`colors`**        | <code><a href="#khipucolors">KhipuColors</a></code> |
 
 
 #### KhipuColors
