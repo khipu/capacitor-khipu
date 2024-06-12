@@ -37,6 +37,9 @@ public class KhipuPlugin extends Plugin {
         if(options.has("title")) {
             optionsBuilder.topBarTitle(Objects.requireNonNull(options.getString("title")));
         }
+        if(options.has("titleImageUrl")) {
+            optionsBuilder.topBarImageUrl(Objects.requireNonNull(options.getString("titleImageUrl")));
+        }
         if(options.has("skipExitPage")) {
             optionsBuilder.skipExitPage(Boolean.TRUE.equals(options.getBool("skipExitPage")));
         }

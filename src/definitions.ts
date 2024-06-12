@@ -10,6 +10,7 @@ export interface StartOperationOptions {
 export interface KhipuOptions {
   locale: string | undefined;
   title: string | undefined;
+  titleImageUrl: string | undefined;
   skipExitPage: boolean | undefined;
   theme: 'light' | 'dark' | 'system' | undefined;
   colors: KhipuColors | undefined;
