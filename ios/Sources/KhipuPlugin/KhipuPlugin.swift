@@ -25,8 +25,8 @@ public class KhipuPlugin: CAPPlugin, CAPBridgedPlugin {
                 optionsBuilder = optionsBuilder.topBarTitle(options!["title"]! as! String)
             }
 
-            if (options["titleImageUrl"] != nil) {
-                optionsBuilder = optionsBuilder.topBarImageUrl(options["titleImageUrl"]! as! String)
+            if (options!["titleImageUrl"] != nil) {
+                optionsBuilder = optionsBuilder.topBarImageUrl(options!["titleImageUrl"]! as! String)
             }
 
             if (options!["skipExitPage"] != nil) {
