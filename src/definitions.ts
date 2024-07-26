@@ -14,6 +14,7 @@ export interface KhipuOptions {
   skipExitPage: boolean | undefined;
   theme: 'light' | 'dark' | 'system' | undefined;
   colors: KhipuColors | undefined;
+  showFooter: boolean | undefined;
 }
 
 export interface KhipuColors {

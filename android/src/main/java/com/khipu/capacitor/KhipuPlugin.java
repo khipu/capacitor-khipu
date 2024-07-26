@@ -43,6 +43,9 @@ public class KhipuPlugin extends Plugin {
         if(options.has("skipExitPage")) {
             optionsBuilder.skipExitPage(Boolean.TRUE.equals(options.getBool("skipExitPage")));
         }
+        if(options.has("showFooter")) {
+            optionsBuilder.showFooter(Boolean.TRUE.equals(options.getBool("showFooter")));
+        }
         if(options.has("locale")) {
             optionsBuilder.locale(Objects.requireNonNull(options.getString("locale")));
         }
