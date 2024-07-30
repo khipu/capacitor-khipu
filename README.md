@@ -140,6 +140,7 @@ startOperation(options: StartOperationOptions) => Promise<KhipuResult>
 | **`skipExitPage`**  | <code>boolean</code>                                |
 | **`theme`**         | <code>'light' \| 'dark' \| 'system'</code>          |
 | **`colors`**        | <code><a href="#khipucolors">KhipuColors</a></code> |
+| **`showFooter`**    | <code>boolean</code>                                |
 
 
 #### KhipuColors
