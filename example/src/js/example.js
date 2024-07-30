@@ -3,7 +3,7 @@ import { Khipu } from 'capacitor-khipu';
 // eslint-disable-next-line no-undef
 window.startOperation = () => {
     Khipu.startOperation({
-        operationId: '3zxucrysvejz',
+        operationId: 'kovybbwrewws',
         options: {
             title: 'Demo Capacitor',
             locale: 'es_CL',
@@ -15,7 +15,7 @@ window.startOperation = () => {
                 // lightTopBarContainer: '#ffffff',
                 // lightOnTopBarContainer: '#333333',
             },
-            showFooter: false,
+            showFooter: true,
         },
     }).then((result) => {
         // eslint-disable-next-line no-undef
