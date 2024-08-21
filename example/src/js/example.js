@@ -16,6 +16,8 @@ window.startOperation = () => {
                 // lightOnTopBarContainer: '#333333',
             },
             showFooter: true,
+            showMerchantLogo: true,
+            showPaymentDetails: true,
         },
     }).then((result) => {
         // eslint-disable-next-line no-undef

@@ -15,6 +15,8 @@ export interface KhipuOptions {
   theme: 'light' | 'dark' | 'system' | undefined;
   colors: KhipuColors | undefined;
   showFooter: boolean | undefined;
+  showMerchantLogo: boolean | undefined;
+  showPaymentDetails: boolean | undefined;
 }
 
 export interface KhipuColors {
