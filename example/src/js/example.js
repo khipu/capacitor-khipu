@@ -3,21 +3,21 @@ import { Khipu } from 'capacitor-khipu';
 // eslint-disable-next-line no-undef
 window.startOperation = () => {
     Khipu.startOperation({
-        operationId: 'kovybbwrewws',
+        operationId: 'z4qi20gyihlu',
         options: {
             title: 'Demo Capacitor',
             locale: 'es_CL',
             theme: 'light',
-            skipExitPage: true,
+            skipExitPage: false,
             colors: {
                 // lightBackground: '#0000ff',
-                lightPrimary: '#ff00ff',
+                // lightPrimary: '#ff00ff',
                 // lightTopBarContainer: '#ffffff',
                 // lightOnTopBarContainer: '#333333',
             },
             showFooter: true,
-            showMerchantLogo: true,
-            showPaymentDetails: true,
+            showMerchantLogo: false,
+            showPaymentDetails: false,
         },
     }).then((result) => {
         // eslint-disable-next-line no-undef
