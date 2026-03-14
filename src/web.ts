@@ -87,12 +87,21 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
         modal: true,
         options: {
           style: {
-            ...(primaryColor !== undefined ? {primaryColor: primaryColor} : {}),
+            ...(primaryColor !== undefined
+              ? { primaryColor: primaryColor }
+              : {}),
             theme: theme,
           },
-          skipExitPage: options.options?.skipExitPage !== undefined ? options.options.skipExitPage : false,
+          skipExitPage:
+            options.options?.skipExitPage !== undefined
+              ? options.options.skipExitPage
+              : false,
+          skipExitSuccessPage:
+            options.options?.skipExitSuccessPage !== undefined
+              ? options.options.skipExitSuccessPage
+              : false,
         },
-      }
+      };
       this.khipu.startOperation(options.operationId, (result: KhipuResult)=>{
         resolve(result)
       }, khipuOptions);
