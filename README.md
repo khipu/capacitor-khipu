@@ -133,7 +133,7 @@ startOperation(options: StartOperationOptions) => Promise<KhipuResult>
 #### KhipuOptions
 
 | Prop                      | Type                                                |
-|---------------------------| --------------------------------------------------- |
+| ------------------------- | --------------------------------------------------- |
 | **`locale`**              | <code>string</code>                                 |
 | **`title`**               | <code>string</code>                                 |
 | **`titleImageUrl`**       | <code>string</code>                                 |
