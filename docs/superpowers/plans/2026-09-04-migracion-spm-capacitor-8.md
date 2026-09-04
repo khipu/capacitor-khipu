@@ -1342,15 +1342,35 @@ let state = loadState(initialState());
 function render() {
   dom.operationId.value = state.operationId;
   dom.colorsInclude.checked = state.colors.include;
-  renderOptions(dom.options, state, (key, entry) => {
-    state.options[key] = entry;
-    commit();
-  });
-  renderColors(dom.colors, state, (key, entry) => {
-    state.colors.fields[key] = entry;
-    commit();
-  });
+  renderOptions(dom.options, state, (key, entry) => apply(state.options, key, entry));
+  renderColors(dom.colors, state, (key, entry) => apply(state.colors.fields, key, entry));
   renderPayload(dom.payload, buildPayload(state));
+}
+
+/**
+ * Re-dibuja el formulario completo solo cuando cambia `include`, que es lo único
+ * que altera el `disabled` del control y el aspecto de la fila. Para un cambio de
+ * valor basta refrescar el preview.
+ *
+ * La distinción no es cosmética: `renderOptions` y `renderColors` usan
+ * `replaceChildren`, así que un re-render destruye el input y le quita el foco a
+ * quien esté tipeando. Sin esto, escribir en `title`, `titleImageUrl` o `locale`
+ * pierde el foco en cada carácter.
+ *
+ * De paso cierra el riesgo del closure de `ui.js`: los handlers capturan `entry`
+ * en el momento del render, y como todo cambio de `include` fuerza un re-render,
+ * el `include` capturado nunca queda viejo.
+ */
+function apply(bag, key, entry) {
+  const toggled = bag[key].include !== entry.include;
+  bag[key] = entry;
+  saveState(state);
+
+  if (toggled) {
+    render();
+  } else {
+    renderPayload(dom.payload, buildPayload(state));
+  }
 }
 
 function commit() {
@@ -1417,6 +1437,8 @@ Abrir la URL que imprime Vite y comprobar a mano:
 - el aviso de plataforma web lista los campos ignorados;
 - marcar `incluir` habilita el control y agrega la clave al payload;
 - desmarcar la quita del payload;
+- **escribir una palabra completa en `title` sin perder el foco** — esto verifica que
+  un cambio de valor no re-dibuja el formulario;
 - un booleano incluido en `false` aparece como `false` en el payload;
 - los cuatro presets cambian el payload;
 - recargar la página conserva el `operationId` y las casillas.
