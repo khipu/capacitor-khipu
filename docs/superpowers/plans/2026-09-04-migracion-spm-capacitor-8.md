@@ -1674,7 +1674,7 @@ git commit -m "feat: soportar Capacitor 7 y actualizar el tooling"
 
 **Interfaces:**
 - Consumes: nada.
-- Produces: los schemes `CapacitorKhipu` (build) y `CapacitorKhipu-Package` (tests).
+- Produces: los schemes `CapacitorKhipu` (build) y `CapacitorKhipu` (tests).
 
 **Contexto:** `ios/Tests/KhipuPluginTests/KhipuPluginTests.swift` instancia `Khipu()`
 y llama `.echo()`; ninguno de los dos existe — es boilerplate del template. Hoy no
@@ -1755,7 +1755,7 @@ Le falta el subcomando `build`. En `package.json`:
 
 - [ ] **Step 4: Confirmar que el build de tests falla con el test roto**
 
-Run: `xcodebuild build-for-testing -scheme CapacitorKhipu-Package -destination 'platform=iOS Simulator,name=iPhone 16'`
+Run: `xcodebuild build-for-testing -scheme CapacitorKhipu -destination 'platform=iOS Simulator,name=iPhone 16'`
 
 Expected: FAIL con `cannot find 'Khipu' in scope` en `KhipuPluginTests.swift`. Esto
 confirma el defecto (a) del spec.
@@ -1792,7 +1792,7 @@ final class KhipuPluginTests: XCTestCase {
 
 ```bash
 npm run verify:ios
-xcodebuild test -scheme CapacitorKhipu-Package -destination 'platform=iOS Simulator,name=iPhone 16'
+xcodebuild test -scheme CapacitorKhipu -destination 'platform=iOS Simulator,name=iPhone 16'
 ```
 
 Expected: el build pasa y los 2 tests pasan. La primera resolución de SPM descarga
@@ -1802,8 +1802,22 @@ los xcframeworks de `capacitor-swift-pm`, así que puede tardar.
 
 ```bash
 git add Package.swift CapacitorKhipu.podspec package.json ios/Tests/KhipuPluginTests/KhipuPluginTests.swift
-git commit -m "feat(ios): agregar Package.swift para consumo por SPM"
+git commit -m "feat(ios): add Package.swift for SPM consumption"
 ```
+
+### Nombres verificados, para las tareas que siguen
+
+- **El único scheme es `CapacitorKhipu`.** Confirmado con `xcodebuild -list`: no existe
+  un `CapacitorKhipu-Package`. Ese sufijo aparece cuando un paquete se abre dentro de un
+  workspace de Xcode, no cuando `xcodebuild` construye el paquete directamente. El
+  scheme `CapacitorKhipu` incluye el test target, así que `xcodebuild test -scheme
+  CapacitorKhipu` corre los tests.
+- **La destination por nombre de dispositivo puede ser ambigua en una máquina de
+  desarrollo.** `iPhone 16` existe bajo más de un runtime instalado (acá, iOS 18.1 y
+  18.5), y en ese caso hay que añadir `,OS=<versión>`. **`OS=latest` no sirve**:
+  `xcodebuild` lo rechaza, comprobado. En los runners de CI normalmente hay un solo
+  runtime, así que la forma sin `OS=` alcanza; si el CI se queja de ambigüedad, fijar la
+  versión que el runner tenga.
 
 ---
 
@@ -2026,7 +2040,7 @@ final class KhipuOptionsMapperTests: XCTestCase {
 
 - [ ] **Step 3: Correr y confirmar que falla**
 
-Run: `xcodebuild test -scheme CapacitorKhipu-Package -destination 'platform=iOS Simulator,name=iPhone 16'`
+Run: `xcodebuild test -scheme CapacitorKhipu -destination 'platform=iOS Simulator,name=iPhone 16'`
 
 Expected: FAIL con `cannot find 'KhipuOptionsMapper' in scope`.
 
@@ -2148,7 +2162,7 @@ enum KhipuOptionsMapper {
 
 - [ ] **Step 5: Correr y confirmar que pasan**
 
-Run: `xcodebuild test -scheme CapacitorKhipu-Package -destination 'platform=iOS Simulator,name=iPhone 16'`
+Run: `xcodebuild test -scheme CapacitorKhipu -destination 'platform=iOS Simulator,name=iPhone 16'`
 
 Expected: 14 tests pasan (12 del mapper y 2 del plugin).
 
@@ -2281,7 +2295,7 @@ El `import KhipuClientIOS` se mantiene porque `KhipuLauncher` sigue usándose.
 
 ```bash
 npm run verify:ios
-xcodebuild test -scheme CapacitorKhipu-Package -destination 'platform=iOS Simulator,name=iPhone 16'
+xcodebuild test -scheme CapacitorKhipu -destination 'platform=iOS Simulator,name=iPhone 16'
 npm run swiftlint -- lint
 ```
 
@@ -2677,7 +2691,7 @@ jobs:
       - name: Build del paquete
         run: xcodebuild build -scheme CapacitorKhipu -destination generic/platform=iOS
       - name: Tests del paquete
-        run: xcodebuild test -scheme CapacitorKhipu-Package -destination 'platform=iOS Simulator,name=iPhone 16'
+        run: xcodebuild test -scheme CapacitorKhipu -destination 'platform=iOS Simulator,name=iPhone 16'
       - name: Instalar SwiftLint
         run: brew list swiftlint || brew install swiftlint
       - name: Confirmar que SwiftLint existe
@@ -3019,7 +3033,7 @@ En `CapacitorKhipu.podspec`:
 ```bash
 npm run verify:versions
 npm run verify:ios
-xcodebuild test -scheme CapacitorKhipu-Package -destination 'platform=iOS Simulator,name=iPhone 16'
+xcodebuild test -scheme CapacitorKhipu -destination 'platform=iOS Simulator,name=iPhone 16'
 npm run swiftlint -- lint
 ```
 
