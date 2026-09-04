@@ -45,6 +45,7 @@ android {
 repositories {
     google()
     mavenCentral()
+    maven { url 'https://dev.khipu.com/nexus/content/repositories/khenshin' }
 }
 
 
