@@ -1824,6 +1824,7 @@ git commit -m "feat(ios): agregar Package.swift para consumo por SPM"
   - `struct KhipuColorsDraft: Equatable` con los 12 colores opcionales.
   - `KhipuOptionsMapper.draft(from: JSObject?) -> KhipuOptionsDraft`
   - `KhipuOptionsMapper.map(_ options: JSObject?) -> KhipuOptions`
+  - `KhipuPlugin.topMost(from: UIViewController) -> UIViewController`
 
 **Contexto:** `KhipuPlugin.swift` mapea las opciones con `as!` en unos veinte
 lugares, así que un `title: 123` enviado desde JS hace crashear la app en vez de
@@ -2151,6 +2152,78 @@ Run: `xcodebuild test -scheme CapacitorKhipu-Package -destination 'platform=iOS 
 
 Expected: 14 tests pasan (12 del mapper y 2 del plugin).
 
+- [ ] **Step 5b: Presentar sobre el controlador que está arriba, no sobre el del puente**
+
+Defecto aparte del mapeo, en el mismo método. Hoy `startOperation` hace:
+
+```swift
+guard let presenter = self.bridge?.viewController else {
+    handleError(call, "new viewController in the bridge.")
+    return
+}
+```
+
+y `KhipuLauncher.launch` termina en `presenter.present(view, animated: true)`. UIKit
+**rechaza presentar sobre un controlador que ya está presentando algo**. Así que un
+comercio que llame al plugin mientras tiene su propio modal en pantalla no obtiene
+nada: ni hoja de pago, ni un error sobre el que pueda actuar. El
+`bridge.viewController` no salva de esto — si es él el que tiene el modal encima, la
+presentación se rechaza igual.
+
+Agregar a `KhipuPlugin.swift`, dentro del tipo:
+
+```swift
+    /// Devuelve el controlador que está efectivamente arriba, siguiendo la cadena de
+    /// presentación desde el que da el puente.
+    ///
+    /// UIKit rechaza presentar sobre un controlador que ya está presentando, así que
+    /// sin esto el pago no aparece cuando el comercio tiene su propio modal en
+    /// pantalla.
+    ///
+    /// Deliberadamente NO es una extensión de `UIViewController`: el plugin se enlaza
+    /// estáticamente en la app del comercio, y un nombre como `topMostViewController`
+    /// inyectado ahí puede chocar con el suyo.
+    static func topMost(from controller: UIViewController) -> UIViewController {
+        var top = controller
+        while let presented = top.presentedViewController {
+            top = presented
+        }
+        return top
+    }
+```
+
+Y corregir el mensaje de error, que hoy dice «new viewController» por un typo de «no
+viewController» y llega al comercio a través de `call.reject`.
+
+- [ ] **Step 5c: Test de la cadena de presentación**
+
+Agregar a `ios/Tests/KhipuPluginTests/KhipuPluginTests.swift`:
+
+```swift
+    func testTopMostSigueLaCadenaDePresentacion() {
+        let root = UIViewController()
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = root
+        window.makeKeyAndVisible()
+
+        XCTAssertIdentical(KhipuPlugin.topMost(from: root), root)
+
+        let modal = UIViewController()
+        let presentado = expectation(description: "modal presentado")
+        root.present(modal, animated: false) { presentado.fulfill() }
+        wait(for: [presentado], timeout: 5)
+
+        XCTAssertIdentical(KhipuPlugin.topMost(from: root), modal)
+    }
+```
+
+La primera aserción es tan importante como la segunda: verifica que el arreglo no
+altera el caso en que no hay nada presentado.
+
+**Si este test resulta inestable en el target de tests de SPM** (que corre sin app
+anfitriona, y `present` puede ser poco fiable ahí): **no lo borres y no borres el
+arreglo.** Repórtalo con la salida y lo decido yo.
+
 - [ ] **Step 6: Usar el mapper en el plugin**
 
 En `ios/Sources/KhipuPlugin/KhipuPlugin.swift`, reemplazar todo el bloque que va
@@ -2166,12 +2239,13 @@ desde `var optionsBuilder = KhipuOptions.Builder()` hasta el cierre del `if` de
 
         let options = KhipuOptionsMapper.map(call.getObject("options"))
 
-        guard let presenter = self.bridge?.viewController else {
-            handleError(call, "new viewController in the bridge.")
+        guard let bridgeController = self.bridge?.viewController else {
+            handleError(call, "no viewController in the bridge.")
             return
         }
 
         DispatchQueue.main.async {
+            let presenter = Self.topMost(from: bridgeController)
             KhipuLauncher.launch(presenter: presenter,
                                  operationId: operationId,
                                  options: options) { result in
@@ -2606,6 +2680,8 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+      - name: Validar el wrapper de Gradle
+        uses: gradle/actions/wrapper-validation@v4
       - uses: android-actions/setup-android@v3
       - uses: actions/setup-node@v4
         with:
