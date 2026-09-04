@@ -2663,6 +2663,35 @@ git add scripts package.json
 git commit -m "chore: guard the KhipuClientIOS version and the option key contract"
 ```
 
+### Extensión pendiente: la dirección de vuelta
+
+La guarda de arriba cubre el camino de **ida** (JS → nativo). El camino de **vuelta**
+—las 8 claves del `KhipuResult` que el nativo devuelve a JS— tiene el mismo problema y
+una asimetría que lo hace peor:
+
+| | Cómo arma el resultado | ¿Verificable desde nuestro código? |
+| --- | --- | --- |
+| iOS | `call.resolve([...])` con las 8 claves como literales, en `KhipuPlugin.swift` | **Sí** |
+| Android | `new JSObject(khipuResult.asJson())` en `KhipuPlugin.java:126` — delega la forma entera al SDK | **No**: las claves no están en nuestro fuente |
+
+Por qué importa: si alguien renombra una clave del diccionario de `call.resolve`, el
+comercio recibe `undefined` en ese campo. **No hay ninguna alarma**: los tipos de
+TypeScript se borran en runtime, así que nada falla, nada se queja, y el campo
+simplemente no llega. Y como Android obtiene su forma del SDK y iOS la construye a
+mano, las dos plataformas pueden discrepar sobre la forma del resultado sin que nada en
+este repo lo note.
+
+**Lo que se hace:** extender `scripts/check-option-keys.mjs` para comparar también las
+claves de `call.resolve` de `KhipuPlugin.swift` contra la interfaz `KhipuResult` de
+`src/definitions.ts`. Cubre la mitad verificable.
+
+**Lo que no se puede hacer, y por qué:** el lado Android no es comprobable
+estáticamente. Esa mitad se cubre a mano, y sale casi gratis porque el harness **ya
+muestra** los campos del resultado: basta correr la misma operación en iOS y en Android
+y comparar qué campos aparecen. Está agregado a la verificación manual de las Tasks 10
+y 15.
+
+
 ---
 
 ## Task 10: App de ejemplo a Capacitor 7 con CocoaPods
@@ -2772,7 +2801,11 @@ Comprobar a mano, con un `operationId` válido:
 - el preset *Marca Khipu* aplica el púrpura `#8347AD` a la barra superior;
 - `showFooter` incluido en `false` oculta el footer, y sin incluir lo deja visible;
 - `skipExitSuccessPage` en `true` salta la página de salida;
-- al terminar, el resultado se renderiza con sus campos y la tabla de eventos.
+- al terminar, el resultado se renderiza con sus campos y la tabla de eventos;
+- comparar los campos del resultado con la corrida de la otra plataforma: deben
+  aparecer los mismos. Es la única forma de detectar que iOS y Android discrepen sobre
+  la forma del `KhipuResult`, porque iOS la construye a mano y Android la delega al SDK,
+  así que ninguna guarda estática puede compararlas;
 
 - [ ] **Step 5: Correr el harness en un emulador de Android**
 
@@ -3331,7 +3364,11 @@ Comprobar a mano, con un `operationId` válido:
   iconos** — esto es lo que verifica la carga del resource bundle bajo SPM;
 - el preset *Marca Khipu* aplica el púrpura `#8347AD`;
 - `showFooter` incluido en `false` oculta el footer, sin incluir lo deja visible;
-- el resultado se renderiza con sus campos y la tabla de eventos.
+- el resultado se renderiza con sus campos y la tabla de eventos;
+- comparar los campos del resultado con la corrida de la otra plataforma: deben
+  aparecer los mismos. Es la única forma de detectar que iOS y Android discrepen sobre
+  la forma del `KhipuResult`, porque iOS la construye a mano y Android la delega al SDK,
+  así que ninguna guarda estática puede compararlas;
 
 - [ ] **Step 6: Compuerta bloqueante — Kotlin 2.2.20 contra `khipu-client-android`**
 
