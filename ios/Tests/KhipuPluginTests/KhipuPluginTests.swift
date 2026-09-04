@@ -1,15 +1,21 @@
 import XCTest
+
 @testable import KhipuPlugin
 
-class KhipuTests: XCTestCase {
-    func testEcho() {
-        // This is an example of a functional test case for a plugin.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+final class KhipuPluginTests: XCTestCase {
 
-        let implementation = Khipu()
-        let value = "Hello, World!"
-        let result = implementation.echo(value)
+    func testDeclaraLaIdentidadQueElPuenteDeCapacitorEspera() {
+        let plugin = KhipuPlugin()
 
-        XCTAssertEqual(value, result)
+        XCTAssertEqual(plugin.identifier, "KhipuPlugin")
+        XCTAssertEqual(plugin.jsName, "Khipu")
+    }
+
+    func testExponeSoloStartOperationComoPromesa() {
+        let plugin = KhipuPlugin()
+
+        XCTAssertEqual(plugin.pluginMethods.count, 1)
+        XCTAssertEqual(plugin.pluginMethods.first?.name, "startOperation")
+        XCTAssertEqual(plugin.pluginMethods.first?.returnType, "promise")
     }
 }
