@@ -49,6 +49,11 @@ Java + Gradle, Vitest + jsdom, XCTest, GitHub Actions.
   usuario antes de ejecutarse.** Son acciones hacia afuera e irreversibles.
 - El tooling JS (Vitest, ESLint, Prettier, Rollup, TypeScript, docgen) se mantiene
   idéntico en ambos branches: es independiente del major de Capacitor.
+- **Node ≥22 en las dos líneas.** `@capacitor/cli@8.5.1` declara
+  `engines.node >= 22.0.0`, y Vitest 5 / jsdom 30 lo exigen en runtime. Se declara en
+  `package.json` (`engines`) y en `.nvmrc`, y el CI usa `node-version: 22`. Para la
+  línea de Capacitor 7 es más estricto de lo que Capacitor pide (`>=20.0.0`), pero se
+  mantiene igual porque el tooling JS es compartido.
 
 ## Estructura de archivos
 
@@ -59,6 +64,7 @@ Java + Gradle, Vitest + jsdom, XCTest, GitHub Actions.
 | `Package.swift` | manifest SPM: nombres, plataforma, dependencias, targets |
 | `CapacitorKhipu.podspec` | manifest CocoaPods, espejo del anterior |
 | `vitest.config.ts` | configuración de tests JS (entorno jsdom, qué archivos incluir) |
+| `.nvmrc` | versión de Node del proyecto (`22`), espejo de `engines` |
 | `scripts/check-native-versions.mjs` | guarda que impide que el podspec y `Package.swift` se desincronicen |
 | `.github/workflows/ci.yml` | lint, tests, builds de iOS y Android, build de la app de ejemplo |
 
@@ -2487,6 +2493,10 @@ el job de Android necesita `npm ci` antes del build. `capacitor-swift-pm` se
 distribuye como binary targets, así que la resolución de SPM descarga xcframeworks
 y conviene cachearla.
 
+El `node-version: 22` no es arbitrario: `@capacitor/cli@8.5.1` declara
+`"engines": { "node": ">=22.0.0" }`, y el tooling de test (Vitest 5, jsdom 30)
+también lo exige en runtime. La Task 1 deja `engines` y `.nvmrc` declarándolo.
+
 **Nota realista:** es esperable que el primer run necesite ajustes (nombres de
 simulador disponibles en el runner, versiones del Android SDK). Iterar sobre el
 workflow hasta que pase es parte de la tarea, no una señal de que el diseño esté mal.
@@ -2511,7 +2521,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run eslint
@@ -2526,7 +2536,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - name: Cachear la resolución de SPM
@@ -2554,7 +2564,7 @@ jobs:
       - uses: android-actions/setup-android@v3
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: ./gradlew clean build test
@@ -2567,7 +2577,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run build
