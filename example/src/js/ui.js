@@ -13,9 +13,7 @@ function row(field, entry, onChange) {
   include.type = 'checkbox';
   include.checked = entry.include;
   include.id = `include-${field.key}`;
-  include.addEventListener('change', () =>
-    onChange({ include: include.checked, value: entry.value }),
-  );
+  include.addEventListener('change', () => onChange({ include: include.checked, value: entry.value }));
 
   const label = document.createElement('label');
   label.htmlFor = `include-${field.key}`;
@@ -23,8 +21,7 @@ function row(field, entry, onChange) {
   if (!field.webSupported) {
     const badge = document.createElement('span');
     badge.className = 'badge';
-    badge.title =
-      'src/web.ts ignora este campo; solo tiene efecto en iOS y Android';
+    badge.title = 'src/web.ts ignora este campo; solo tiene efecto en iOS y Android';
     badge.textContent = 'sin web';
     label.appendChild(badge);
   }
@@ -34,7 +31,7 @@ function row(field, entry, onChange) {
 }
 
 function control(field, entry, onChange) {
-  const emit = value => onChange({ include: entry.include, value });
+  const emit = (value) => onChange({ include: entry.include, value });
 
   if (field.type === 'select') {
     const select = document.createElement('select');
@@ -78,25 +75,21 @@ function control(field, entry, onChange) {
 
 export function renderOptions(container, state, onChange) {
   container.replaceChildren(
-    ...OPTION_FIELDS.map(field =>
-      row(field, state.options[field.key], entry => onChange(field.key, entry)),
-    ),
+    ...OPTION_FIELDS.map((field) => row(field, state.options[field.key], (entry) => onChange(field.key, entry))),
   );
 }
 
 export function renderColors(container, state, onChange) {
   container.replaceChildren(
-    ...COLOR_FIELDS.map(field =>
-      row({ ...field, type: 'color' }, state.colors.fields[field.key], entry =>
-        onChange(field.key, entry),
-      ),
+    ...COLOR_FIELDS.map((field) =>
+      row({ ...field, type: 'color' }, state.colors.fields[field.key], (entry) => onChange(field.key, entry)),
     ),
   );
 }
 
 export function renderPresets(container, onSelect) {
   container.replaceChildren(
-    ...PRESETS.map(preset => {
+    ...PRESETS.map((preset) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = preset.label;

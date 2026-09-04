@@ -56,8 +56,6 @@ describe('storage', () => {
       }),
     );
 
-    expect(loadState(initialState()).options).not.toHaveProperty(
-      'flagQueYaNoExiste',
-    );
+    expect(loadState(initialState()).options).not.toHaveProperty('flagQueYaNoExiste');
   });
 });

@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  COLOR_FIELDS,
-  OPTION_FIELDS,
-  PRESETS,
-  applyPreset,
-  initialState,
-} from './fields.js';
+import { COLOR_FIELDS, OPTION_FIELDS, PRESETS, applyPreset, initialState } from './fields.js';
 import { buildPayload } from './payload.js';
 
 describe('buildPayload', () => {
@@ -63,24 +57,22 @@ describe('buildPayload', () => {
 
 describe('applyPreset', () => {
   it('el preset "all" incluye los 9 campos y los 12 colores', () => {
-    const preset = PRESETS.find(item => item.id === 'all');
+    const preset = PRESETS.find((item) => item.id === 'all');
     const payload = buildPayload(applyPreset(initialState(), preset));
 
     expect(Object.keys(payload.options)).toHaveLength(OPTION_FIELDS.length + 1);
-    expect(Object.keys(payload.options.colors)).toHaveLength(
-      COLOR_FIELDS.length,
-    );
+    expect(Object.keys(payload.options.colors)).toHaveLength(COLOR_FIELDS.length);
   });
 
   it('el preset "defaults" no incluye nada', () => {
-    const preset = PRESETS.find(item => item.id === 'defaults');
+    const preset = PRESETS.find((item) => item.id === 'defaults');
     const payload = buildPayload(applyPreset(initialState(), preset));
 
     expect(payload.options).toEqual({});
   });
 
   it('el preset "dark" fuerza el valor del tema', () => {
-    const preset = PRESETS.find(item => item.id === 'dark');
+    const preset = PRESETS.find((item) => item.id === 'dark');
     const payload = buildPayload(applyPreset(initialState(), preset));
 
     expect(payload.options.theme).toBe('dark');
@@ -89,7 +81,7 @@ describe('applyPreset', () => {
   it('preserva el operationId ya tipeado', () => {
     const state = initialState();
     state.operationId = 'no-me-borres';
-    const preset = PRESETS.find(item => item.id === 'khipu');
+    const preset = PRESETS.find((item) => item.id === 'khipu');
 
     expect(applyPreset(state, preset).operationId).toBe('no-me-borres');
   });

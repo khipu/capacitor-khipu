@@ -1,10 +1,6 @@
 import { WebPlugin } from '@capacitor/core';
 
-import type {
-  KhipuPlugin,
-  KhipuResult,
-  StartOperationOptions,
-} from './definitions';
+import type { KhipuPlugin, KhipuResult, StartOperationOptions } from './definitions';
 
 export class KhipuWeb extends WebPlugin implements KhipuPlugin {
   private static KWS_SCRIPT_ID = 'kws_script_id';
@@ -47,20 +43,14 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
   ensureKhipuIsSet(): Promise<any> {
     const start = Date.now();
     return new Promise(waitForKhipu); // set the promise object within the ensureFooIsSet object
-    function waitForKhipu(
-      resolve: (arg0: any) => void,
-      reject: (arg0: Error) => void,
-    ) {
+    function waitForKhipu(resolve: (arg0: any) => void, reject: (arg0: Error) => void) {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
       if (typeof Khipu !== 'undefined') {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         resolve(Khipu);
-      } else if (
-        KhipuWeb.KWS_TIMEOUT &&
-        Date.now() - start >= KhipuWeb.KWS_TIMEOUT
-      )
+      } else if (KhipuWeb.KWS_TIMEOUT && Date.now() - start >= KhipuWeb.KWS_TIMEOUT)
         reject(new Error('timeout waiting for kws to inject Khipu'));
       else {
         setTimeout(() => {
@@ -71,7 +61,7 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
   }
 
   async startKhipu(options: StartOperationOptions): Promise<any> {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
       this.khipu = new Khipu();
@@ -85,15 +75,9 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
         }
       }
       let primaryColor = undefined;
-      if (
-        theme === 'light' &&
-        options.options.colors?.lightPrimary !== undefined
-      ) {
+      if (theme === 'light' && options.options.colors?.lightPrimary !== undefined) {
         primaryColor = options.options.colors?.lightPrimary;
-      } else if (
-        theme === 'dark' &&
-        options.options.colors?.darkPrimary !== undefined
-      ) {
+      } else if (theme === 'dark' && options.options.colors?.darkPrimary !== undefined) {
         primaryColor = options.options.colors?.darkPrimary;
       }
 
@@ -102,19 +86,12 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
         modal: true,
         options: {
           style: {
-            ...(primaryColor !== undefined
-              ? { primaryColor: primaryColor }
-              : {}),
+            ...(primaryColor !== undefined ? { primaryColor: primaryColor } : {}),
             theme: theme,
           },
-          skipExitPage:
-            options.options?.skipExitPage !== undefined
-              ? options.options.skipExitPage
-              : false,
+          skipExitPage: options.options?.skipExitPage !== undefined ? options.options.skipExitPage : false,
           skipExitSuccessPage:
-            options.options?.skipExitSuccessPage !== undefined
-              ? options.options.skipExitSuccessPage
-              : false,
+            options.options?.skipExitSuccessPage !== undefined ? options.options.skipExitSuccessPage : false,
         },
       };
       this.khipu.startOperation(

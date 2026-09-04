@@ -1,12 +1,4 @@
-const FIELDS = [
-  'operationId',
-  'result',
-  'exitTitle',
-  'exitMessage',
-  'exitUrl',
-  'failureReason',
-  'continueUrl',
-];
+const FIELDS = ['operationId', 'result', 'exitTitle', 'exitMessage', 'exitUrl', 'failureReason', 'continueUrl'];
 
 function field(key, value, result) {
   const dt = document.createElement('dt');

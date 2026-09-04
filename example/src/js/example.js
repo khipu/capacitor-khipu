@@ -1,21 +1,11 @@
 import { Capacitor } from '@capacitor/core';
 import { Khipu } from 'capacitor-khipu';
 
-import {
-  COLOR_FIELDS,
-  OPTION_FIELDS,
-  applyPreset,
-  initialState,
-} from './fields.js';
+import { COLOR_FIELDS, OPTION_FIELDS, applyPreset, initialState } from './fields.js';
 import { buildPayload } from './payload.js';
 import { renderError, renderResult } from './result.js';
 import { loadState, saveState } from './storage.js';
-import {
-  renderColors,
-  renderOptions,
-  renderPayload,
-  renderPresets,
-} from './ui.js';
+import { renderColors, renderOptions, renderPayload, renderPresets } from './ui.js';
 
 const dom = {
   operationId: document.getElementById('operationId'),
@@ -34,12 +24,8 @@ let state = loadState(initialState());
 function render() {
   dom.operationId.value = state.operationId;
   dom.colorsInclude.checked = state.colors.include;
-  renderOptions(dom.options, state, (key, entry) =>
-    apply(state.options, key, entry),
-  );
-  renderColors(dom.colors, state, (key, entry) =>
-    apply(state.colors.fields, key, entry),
-  );
+  renderOptions(dom.options, state, (key, entry) => apply(state.options, key, entry));
+  renderColors(dom.colors, state, (key, entry) => apply(state.colors.fields, key, entry));
   renderPayload(dom.payload, buildPayload(state));
 }
 
@@ -84,9 +70,7 @@ function platformNote() {
     return `Plataforma ${Capacitor.getPlatform()}: todos los campos tienen efecto.`;
   }
 
-  const ignored = [...OPTION_FIELDS, ...COLOR_FIELDS]
-    .filter(entry => !entry.webSupported)
-    .map(entry => entry.key);
+  const ignored = [...OPTION_FIELDS, ...COLOR_FIELDS].filter((entry) => !entry.webSupported).map((entry) => entry.key);
 
   return `Plataforma web: el fallback de src/web.ts ignora ${
     ignored.length
@@ -106,7 +90,7 @@ dom.colorsInclude.addEventListener('change', () => {
   commit();
 });
 
-renderPresets(dom.presets, preset => {
+renderPresets(dom.presets, (preset) => {
   state = applyPreset(state, preset);
   commit();
 });

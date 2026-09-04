@@ -111,8 +111,8 @@ export const PRESETS = [
   {
     id: 'all',
     label: 'Todo activado',
-    optionKeys: OPTION_FIELDS.map(field => field.key),
-    colorKeys: COLOR_FIELDS.map(field => field.key),
+    optionKeys: OPTION_FIELDS.map((field) => field.key),
+    colorKeys: COLOR_FIELDS.map((field) => field.key),
   },
   {
     id: 'dark',
