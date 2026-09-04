@@ -30,50 +30,82 @@
     "native"
   ],
   "scripts": {
-    "verify": "npm run verify:ios && npm run verify:android && npm run verify:web",
-    "verify:ios": "xcodebuild -scheme CapacitorKhipu -destination generic/platform=iOS",
+    "verify": "npm run test && npm run verify:versions && npm run verify:keys && npm run verify:ios && npm run verify:android && npm run verify:web",
+    "test": "vitest run",
+    "verify:versions": "node scripts/check-native-versions.mjs",
+    "verify:keys": "node scripts/check-option-keys.mjs",
+    "verify:ios": "xcodebuild build -scheme CapacitorKhipu -destination generic/platform=iOS",
     "verify:android": "cd android && ./gradlew clean build test && cd ..",
     "verify:web": "npm run build",
     "lint": "npm run eslint && npm run prettier -- --check && npm run swiftlint -- lint",
     "fmt": "npm run eslint -- --fix && npm run prettier -- --write && npm run swiftlint -- --fix --format",
-    "eslint": "eslint . --ext ts",
-    "prettier": "prettier \"**/*.{css,html,ts,js,java}\"",
+    "eslint": "eslint . --ext ts,js,mjs,mts --max-warnings 0",
+    "prettier": "prettier \"**/*.{css,html,ts,js,java}\" --plugin=prettier-plugin-java",
     "swiftlint": "node-swiftlint",
     "docgen": "docgen --api KhipuPlugin --output-readme README.md --output-json dist/docs.json",
-    "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.js",
+    "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.mjs",
     "clean": "rimraf ./dist",
     "watch": "tsc --watch",
     "prepublishOnly": "npm run build",
     "release": "release-it"
   },
   "devDependencies": {
-    "@capacitor/android": "^5.0.0",
-    "@capacitor/core": "^5.0.0",
-    "@capacitor/docgen": "^0.2.2",
-    "@capacitor/ios": "^5.0.0",
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/cli": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/docgen": "^0.3.1",
+    "@capacitor/ios": "^8.5.1",
     "@commitlint/config-conventional": "^19.2.2",
     "@evilmartians/lefthook": "^1.6.14",
-    "@ionic/eslint-config": "^0.3.0",
-    "@ionic/prettier-config": "^1.0.1",
-    "@ionic/swiftlint-config": "^1.1.2",
+    "@ionic/eslint-config": "^0.4.0",
+    "@ionic/prettier-config": "^4.0.0",
+    "@ionic/swiftlint-config": "^2.0.0",
     "@release-it/conventional-changelog": "^8.0.1",
     "commitlint": "^19.3.0",
-    "eslint": "^7.11.0",
-    "prettier": "~2.3.0",
-    "prettier-plugin-java": "~1.0.2",
+    "eslint": "^8.57.1",
+    "jsdom": "^30.0.1",
+    "prettier": "^3.9.6",
+    "prettier-plugin-java": "^2.10.3",
     "release-it": "^17.3.0",
-    "rimraf": "^3.0.2",
-    "rollup": "^2.32.0",
-    "swiftlint": "^1.0.1",
-    "typescript": "~4.1.5"
+    "rimraf": "^6.1.3",
+    "rollup": "^4.63.1",
+    "swiftlint": "^2.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.0"
   },
   "peerDependencies": {
-    "@capacitor/core": "^5.0.0 || ^6.0.0 || ^7.0.0"
+    "@capacitor/core": ">=8.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
   },
   "prettier": "@ionic/prettier-config",
   "swiftlint": "@ionic/swiftlint-config",
   "eslintConfig": {
-    "extends": "@ionic/eslint-config/recommended"
+    "root": true,
+    "extends": "@ionic/eslint-config/recommended",
+    "overrides": [
+      {
+        "files": [
+          "example/**/*.js"
+        ],
+        "rules": {
+          "@typescript-eslint/explicit-module-boundary-types": "off"
+        },
+        "env": {
+          "browser": true
+        }
+      },
+      {
+        "files": [
+          "scripts/**",
+          "*.mjs"
+        ],
+        "env": {
+          "node": true
+        }
+      }
+    ]
   },
   "capacitor": {
     "ios": {

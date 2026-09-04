@@ -22,24 +22,24 @@ export interface KhipuOptions {
 
 export interface KhipuColors {
   lightBackground: string | undefined;
-  lightOnBackground:string | undefined;
-  lightPrimary:string | undefined;
-  lightOnPrimary:string | undefined;
-  lightTopBarContainer:string | undefined;
-  lightOnTopBarContainer:string | undefined;
-  darkBackground:string | undefined;
-  darkOnBackground:string | undefined;
-  darkPrimary:string | undefined;
-  darkOnPrimary:string | undefined;
-  darkTopBarContainer:string | undefined;
-  darkOnTopBarContainer:string | undefined;
+  lightOnBackground: string | undefined;
+  lightPrimary: string | undefined;
+  lightOnPrimary: string | undefined;
+  lightTopBarContainer: string | undefined;
+  lightOnTopBarContainer: string | undefined;
+  darkBackground: string | undefined;
+  darkOnBackground: string | undefined;
+  darkPrimary: string | undefined;
+  darkOnPrimary: string | undefined;
+  darkTopBarContainer: string | undefined;
+  darkOnTopBarContainer: string | undefined;
 }
 
 export interface KhipuResult {
   operationId: string;
   exitTitle: string;
   exitMessage: string;
-  exitUrl: string;
+  exitUrl: string | undefined;
   result: 'OK' | 'ERROR' | 'WARNING' | 'CONTINUE';
   failureReason: string | undefined;
   continueUrl: string | undefined;

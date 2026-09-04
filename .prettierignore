@@ -1,2 +1,5 @@
-build
-dist
+# Bundles web que Capacitor copia a las plataformas nativas en cada `cap sync`.
+# Están ignorados por los .gitignore anidados de example/ios y example/android, pero
+# Prettier 3 solo lee el .gitignore de la raíz, no los anidados.
+example/ios/App/App/public
+example/android/app/src/main/assets/public

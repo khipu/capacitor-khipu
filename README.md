@@ -2,6 +2,19 @@
 
 Capacitor plugin for Khipu
 
+## Compatibilidad
+
+| Capacitor | Plugin | Se instala con | iOS mínimo | minSdk | Estado |
+| --- | --- | --- | --- | --- | --- |
+| 8 | 4.x | `npm install capacitor-khipu` | 15 | 24 | mantenida |
+| 7 | 3.x | `npm install capacitor-khipu@cap7` | 14 | 23 | mantenida |
+| 5 y 6 | 2.11.2 | `npm install capacitor-khipu@cap6` | 13 | 22 | fin de soporte |
+
+Las líneas 3.x y 4.x soportan **CocoaPods y Swift Package Manager**. No hace falta
+ningún paso extra: el CLI de Capacitor usa el `Package.swift` o el
+`CapacitorKhipu.podspec` según el gestor que use tu app. Los dos gestores no pueden
+coexistir en un mismo proyecto iOS.
+
 ## Install
 
 ```bash
@@ -11,7 +24,30 @@ npx cap sync
 
 ## iOS setup
 
-No need for aditional steps
+The Khipu SDK opens the user's bank app to complete two-factor authorization. iOS
+only allows an app to check whether it can open another app's URL scheme
+(`canOpenURL`) if that scheme is declared in advance. Without this, `canOpenURL`
+returns `false`, the SDK silently skips opening the bank app **without raising any
+error**, and the two-factor authorization step simply never happens.
+
+Add `LSApplicationQueriesSchemes` to your app's `Info.plist`:
+
+```xml
+<key>LSApplicationQueriesSchemes</key>
+<array>
+  <string>bancochilemipass2</string>
+  <string>BciPassApp</string>
+  <string>BICEPassApp</string>
+  <string>scotiabankgo</string>
+  <string>SantanderPassApp</string>
+  <string>tupass</string>
+  <string>bancoestado</string>
+  <string>itau.cl</string>
+  <string>SecurityPass</string>
+</array>
+```
+
+This is already applied as a reference in `example/ios/App/App/Info.plist`.
 
 ## Android setup
 
@@ -49,7 +85,7 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:8.2.1'
         classpath 'com.google.gms:google-services:4.4.0'
-        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0'
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.20'
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files

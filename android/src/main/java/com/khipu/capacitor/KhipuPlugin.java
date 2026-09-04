@@ -1,10 +1,9 @@
 package com.khipu.capacitor;
 
-import static com.khipu.client.KhipuKt.getKhipuLauncherIntent;
 import static com.khipu.client.KhipuKt.KHIPU_RESULT_EXTRA;
+import static com.khipu.client.KhipuKt.getKhipuLauncherIntent;
 
 import androidx.activity.result.ActivityResult;
-
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -14,14 +13,11 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.khipu.client.KhipuColors;
 import com.khipu.client.KhipuOptions;
 import com.khipu.client.KhipuResult;
-
-import org.json.JSONException;
-
 import java.util.Objects;
+import org.json.JSONException;
 
 @CapacitorPlugin(name = "Khipu")
 public class KhipuPlugin extends Plugin {
-
 
     @PluginMethod
     public void startOperation(PluginCall call) {
@@ -111,11 +107,7 @@ public class KhipuPlugin extends Plugin {
             }
         }
         optionsBuilder.colors(colorsBuilder.build());
-        startActivityForResult(call, getKhipuLauncherIntent(
-                getContext(),
-                operationId,
-                optionsBuilder.build()
-        ), "operationResult");
+        startActivityForResult(call, getKhipuLauncherIntent(getContext(), operationId, optionsBuilder.build()), "operationResult");
     }
 
     @ActivityCallback
@@ -127,7 +119,9 @@ public class KhipuPlugin extends Plugin {
         JSObject toRet = new JSObject();
         try {
             assert result.getData() != null;
-            KhipuResult khipuResult = (KhipuResult) Objects.requireNonNull(result.getData().getExtras()).getSerializable(KHIPU_RESULT_EXTRA);
+            KhipuResult khipuResult = (KhipuResult) Objects.requireNonNull(result.getData().getExtras()).getSerializable(
+                KHIPU_RESULT_EXTRA
+            );
             assert khipuResult != null;
             toRet = new JSObject(khipuResult.asJson());
         } catch (JSONException e) {

@@ -1,24 +1,58 @@
 <!doctype html>
-<html lang="en" dir="ltr" class="hydrated">
+<html lang="es" dir="ltr">
   <head>
     <meta charset="UTF-8" />
-    <title>Example Capacitor App</title>
-    <meta
-      name="viewport"
-      content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
+    <title>Harness capacitor-khipu</title>
+    <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1.0" />
     <meta name="format-detection" content="telephone=no" />
+    <link rel="stylesheet" href="./css/harness.css" />
   </head>
   <body>
+    <header>
+      <h1>Harness <code>capacitor-khipu</code></h1>
+      <p id="platform-note" class="note"></p>
+    </header>
+
     <main>
-      <h1>Capacitor Test Plugin Project</h1>
-      <p>
-        This project can be used to test out the functionality of your plugin. Nothing in the <em>example/</em> folder
-        will be published to npm when using this template, so you can create away!
-      </p>
-      <label for="result">Result:</label>
-      <textarea id="result" name="result" rows="10"></textarea>
-      <button onclick="startOperation()">Click Me!</button>
+      <section>
+        <h2>Operación</h2>
+        <label for="operationId">operationId</label>
+        <input id="operationId" type="text" autocomplete="off" spellcheck="false" />
+      </section>
+
+      <section>
+        <h2>Presets</h2>
+        <div id="presets" class="presets"></div>
+      </section>
+
+      <section>
+        <h2>Opciones</h2>
+        <p class="hint">
+          Marca <strong>incluir</strong> para enviar la clave. Sin marcar, la clave no va en el payload y el SDK nativo
+          aplica su valor por omisión.
+        </p>
+        <div id="options"></div>
+      </section>
+
+      <section>
+        <h2>Colores</h2>
+        <label class="row">
+          <input id="colors-include" type="checkbox" />
+          enviar el objeto <code>colors</code>
+        </label>
+        <div id="colors"></div>
+      </section>
+
+      <section>
+        <h2>Payload</h2>
+        <pre id="payload"></pre>
+        <button id="start" type="button" class="primary">Iniciar operación</button>
+      </section>
+
+      <section>
+        <h2>Resultado</h2>
+        <div id="result"></div>
+      </section>
     </main>
 
     <script src="./js/example.js" type="module"></script>

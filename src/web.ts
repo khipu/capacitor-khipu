@@ -1,12 +1,11 @@
 import { WebPlugin } from '@capacitor/core';
 
-import type {KhipuPlugin, KhipuResult, StartOperationOptions} from './definitions';
+import type { KhipuPlugin, KhipuResult, StartOperationOptions } from './definitions';
 
 export class KhipuWeb extends WebPlugin implements KhipuPlugin {
-
   private static KWS_SCRIPT_ID = 'kws_script_id';
-  private static KHIPU_WEB_ROOT: 'khipu-web-root';
-  private static KWS_TIMEOUT: 10_000
+  private static KHIPU_WEB_ROOT = 'khipu-web-root';
+  private static KWS_TIMEOUT = 10_000;
 
   private khipu: any;
 
@@ -51,11 +50,11 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         resolve(Khipu);
-      } else if (KhipuWeb.KWS_TIMEOUT && (Date.now() - start) >= KhipuWeb.KWS_TIMEOUT)
-        reject(new Error("timeout waiting for kws to inject Khipu"));
+      } else if (KhipuWeb.KWS_TIMEOUT && Date.now() - start >= KhipuWeb.KWS_TIMEOUT)
+        reject(new Error('timeout waiting for kws to inject Khipu'));
       else {
         setTimeout(() => {
-          waitForKhipu(resolve, reject)
+          waitForKhipu(resolve, reject);
         }, 50);
       }
     }
@@ -67,19 +66,19 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
       // @ts-ignore
       this.khipu = new Khipu();
 
-      let theme = options.options.theme ?? 'light'
+      let theme = options.options.theme ?? 'light';
       if (theme === 'system') {
         if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
-          theme = 'dark'
+          theme = 'dark';
         } else {
-          theme = 'light'
+          theme = 'light';
         }
       }
-      let primaryColor = undefined
+      let primaryColor = undefined;
       if (theme === 'light' && options.options.colors?.lightPrimary !== undefined) {
-        primaryColor = options.options.colors?.lightPrimary
+        primaryColor = options.options.colors?.lightPrimary;
       } else if (theme === 'dark' && options.options.colors?.darkPrimary !== undefined) {
-        primaryColor = options.options.colors?.darkPrimary
+        primaryColor = options.options.colors?.darkPrimary;
       }
 
       const khipuOptions = {
@@ -87,24 +86,21 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
         modal: true,
         options: {
           style: {
-            ...(primaryColor !== undefined
-              ? { primaryColor: primaryColor }
-              : {}),
+            ...(primaryColor !== undefined ? { primaryColor: primaryColor } : {}),
             theme: theme,
           },
-          skipExitPage:
-            options.options?.skipExitPage !== undefined
-              ? options.options.skipExitPage
-              : false,
+          skipExitPage: options.options?.skipExitPage !== undefined ? options.options.skipExitPage : false,
           skipExitSuccessPage:
-            options.options?.skipExitSuccessPage !== undefined
-              ? options.options.skipExitSuccessPage
-              : false,
+            options.options?.skipExitSuccessPage !== undefined ? options.options.skipExitSuccessPage : false,
         },
       };
-      this.khipu.startOperation(options.operationId, (result: KhipuResult)=>{
-        resolve(result)
-      }, khipuOptions);
-    })
+      this.khipu.startOperation(
+        options.operationId,
+        (result: KhipuResult) => {
+          resolve(result);
+        },
+        khipuOptions,
+      );
+    });
   }
 }
