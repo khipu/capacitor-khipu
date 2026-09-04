@@ -2783,6 +2783,43 @@ documentación de Khipu. **No copiarlos de otro repo de ejemplo:** hay copias co
 Verificar: `plutil -lint example/ios/App/App/Info.plist` y
 `grep -c bancochilemipass2 example/ios/App/App/Info.plist` (debe dar 1).
 
+
+- [ ] **Step 3c: Devolver el repo maven de Khenshin al `build.gradle` del ejemplo**
+
+`npx cap add android` regenera `example/android/build.gradle` desde el template, **sin**
+el repo privado donde vive `com.khipu:khipu-client-android`. Que el `android/build.gradle`
+del plugin lo declare **no alcanza**: en Gradle, el bloque `repositories` de un
+subproyecto aplica al resolver *sus propias* configuraciones; cuando la app resuelve su
+classpath —que incluye transitivamente las `implementation` del plugin— usa **los repos
+de la app**.
+
+Verificado en este repo, en las dos direcciones:
+
+```
+sin el repo:  +--- com.khipu:khipu-client-android:2.27.0 FAILED
+con el repo:  +--- com.khipu:khipu-client-android:2.27.0
+```
+
+(con `gradlew -p example/android :app:dependencies --configuration debugRuntimeClasspath`)
+
+En `example/android/build.gradle`, dentro del bloque `allprojects.repositories`:
+
+```groovy
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://dev.khipu.com/nexus/content/repositories/khenshin' }
+    }
+}
+```
+
+Verificar con el mismo comando de arriba: la línea de `khipu-client-android` no debe
+llevar el marcador `FAILED`.
+
+Esto confirma además que la instrucción del README que le pide al comercio agregar ese
+repo a su `allprojects.repositories` **sigue siendo necesaria**, y no debe eliminarse.
+
 - [ ] **Step 4: Correr el harness en un simulador de iOS**
 
 ```bash
@@ -3347,6 +3384,43 @@ agregar dentro del `<dict>` raíz:
 
 Verificar: `plutil -lint example/ios/App/App/Info.plist` y
 `grep -c bancochilemipass2 example/ios/App/App/Info.plist` (debe dar 1).
+
+
+- [ ] **Step 3c: Devolver el repo maven de Khenshin al `build.gradle` del ejemplo**
+
+`npx cap add android` regenera `example/android/build.gradle` desde el template, **sin**
+el repo privado donde vive `com.khipu:khipu-client-android`. Que el `android/build.gradle`
+del plugin lo declare **no alcanza**: en Gradle, el bloque `repositories` de un
+subproyecto aplica al resolver *sus propias* configuraciones; cuando la app resuelve su
+classpath —que incluye transitivamente las `implementation` del plugin— usa **los repos
+de la app**.
+
+Verificado en este repo, en las dos direcciones:
+
+```
+sin el repo:  +--- com.khipu:khipu-client-android:2.27.0 FAILED
+con el repo:  +--- com.khipu:khipu-client-android:2.27.0
+```
+
+(con `gradlew -p example/android :app:dependencies --configuration debugRuntimeClasspath`)
+
+En `example/android/build.gradle`, dentro del bloque `allprojects.repositories`:
+
+```groovy
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://dev.khipu.com/nexus/content/repositories/khenshin' }
+    }
+}
+```
+
+Verificar con el mismo comando de arriba: la línea de `khipu-client-android` no debe
+llevar el marcador `FAILED`.
+
+Esto confirma además que la instrucción del README que le pide al comercio agregar ese
+repo a su `allprojects.repositories` **sigue siendo necesaria**, y no debe eliminarse.
 
 - [ ] **Step 5: Correr el harness en un simulador de iOS**
 
