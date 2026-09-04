@@ -6,8 +6,9 @@ import { describe, expect, it } from 'vitest';
 
 const SCRIPT = 'scripts/check-option-keys.mjs';
 
-// Seis opciones y ocho colores: por encima del piso de cordura (5 y 8), así que un
-// fixture consistente pasa y deja espacio para probar la deriva sin disparar el piso.
+// Seis opciones, ocho colores y seis campos de resultado: por encima del piso de
+// cordura (5, 8 y 5), así que un fixture consistente pasa y deja espacio para probar
+// la deriva sin disparar el piso.
 const OPCIONES = ['title', 'locale', 'theme', 'showFooter', 'showMerchantLogo', 'showPaymentDetails'];
 const COLORES = [
   'lightBackground',
@@ -19,6 +20,7 @@ const COLORES = [
   'darkPrimary',
   'darkOnPrimary',
 ];
+const RESULTADO = ['operationId', 'exitTitle', 'exitMessage', 'result', 'failureReason', 'events'];
 
 function escribir(dir, relativo, contenido) {
   const destino = join(dir, relativo);
@@ -26,8 +28,8 @@ function escribir(dir, relativo, contenido) {
   writeFileSync(destino, contenido);
 }
 
-/** Arma las cuatro superficies. Cada una se puede desviar por separado. */
-function fixture({ contrato = OPCIONES, harness = OPCIONES } = {}) {
+/** Arma las cinco superficies. Cada una se puede desviar por separado. */
+function fixture({ contrato = OPCIONES, harness = OPCIONES, resolve = RESULTADO } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'khipu-keys-'));
 
   const campos = (claves) => claves.map((k) => `  ${k}: string | undefined;`).join('\n');
@@ -35,7 +37,8 @@ function fixture({ contrato = OPCIONES, harness = OPCIONES } = {}) {
     dir,
     'src/definitions.ts',
     `export interface KhipuOptions {\n${campos(contrato)}\n  colors: KhipuColors | undefined;\n}\n\n` +
-      `export interface KhipuColors {\n${campos(COLORES)}\n}\n`,
+      `export interface KhipuColors {\n${campos(COLORES)}\n}\n\n` +
+      `export interface KhipuResult {\n${campos(RESULTADO)}\n}\n`,
   );
 
   const lecturas = (claves, objeto) => claves.map((k) => `    _ = ${objeto}["${k}"]`).join('\n');
@@ -60,6 +63,13 @@ function fixture({ contrato = OPCIONES, harness = OPCIONES } = {}) {
       `export const COLOR_FIELDS = [\n${entradas(COLORES)}\n];\n\nexport const PRESETS = [];\n`,
   );
 
+  const resuelve = (claves) => claves.map((k) => `      "${k}": result.${k},`).join('\n');
+  escribir(
+    dir,
+    'ios/Sources/KhipuPlugin/KhipuPlugin.swift',
+    `func startOperation() {\n    call.resolve([\n${resuelve(resolve)}\n    ])\n}\n`,
+  );
+
   return dir;
 }
 
@@ -73,12 +83,13 @@ function run(base) {
 }
 
 describe('check-option-keys', () => {
-  it('pasa cuando las cuatro superficies coinciden', () => {
+  it('pasa cuando las cinco superficies coinciden', () => {
     const result = run(fixture());
 
     expect(result.code).toBe(0);
     expect(result.output).toContain('6 opciones');
     expect(result.output).toContain('8 colores');
+    expect(result.output).toContain('6 campos');
   });
 
   it('falla nombrando la clave que falta y la que sobra cuando una superficie deriva', () => {
@@ -91,6 +102,16 @@ describe('check-option-keys', () => {
     expect(result.output).toContain('lee/ofrece de más: showFooterX');
   });
 
+  it('falla nombrando la clave que falta y la que sobra cuando el resultado de iOS deriva', () => {
+    const derivado = RESULTADO.map((k) => (k === 'exitTitle' ? 'exitTitleX' : k));
+    const result = run(fixture({ resolve: derivado }));
+
+    expect(result.code).toBe(1);
+    expect(result.output).toContain('KhipuPlugin.swift (resultado) derivó');
+    expect(result.output).toContain('no lee/ofrece: exitTitle');
+    expect(result.output).toContain('lee/ofrece de más: exitTitleX');
+  });
+
   it('dispara el piso de cordura si el contrato se lee casi vacío', () => {
     const result = run(fixture({ contrato: ['title', 'locale'] }));
 
@@ -98,11 +119,12 @@ describe('check-option-keys', () => {
     expect(result.output).toContain('El parser de esta guarda quedó obsoleto');
   });
 
-  it('con los archivos reales del repo las cuatro superficies coinciden', () => {
+  it('con los archivos reales del repo las cinco superficies coinciden', () => {
     const result = run('.');
 
     expect(result.code).toBe(0);
     expect(result.output).toContain('9 opciones');
     expect(result.output).toContain('12 colores');
+    expect(result.output).toContain('8 campos');
   });
 });
