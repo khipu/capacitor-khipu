@@ -100,5 +100,5 @@ jobs:
         run: |
           npm run build
           npx cap sync ios
-          xcodebuild build -workspace ios/App/App.xcworkspace -scheme App -destination generic/platform=iOS CODE_SIGNING_ALLOWED=NO
+          xcodebuild build -project ios/App/App.xcodeproj -scheme App -destination generic/platform=iOS CODE_SIGNING_ALLOWED=NO
         working-directory: example
