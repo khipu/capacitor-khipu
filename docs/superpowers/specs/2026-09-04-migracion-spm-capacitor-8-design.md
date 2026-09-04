@@ -391,13 +391,43 @@ repositorio en un estado que no compile.
 
 ## Riesgos
 
-- **Compatibilidad de `khipu-client-android 2.27.0` con Kotlin 2.2.20.**
-  Capacitor 8 pide Kotlin 2.2.20 en la app del comercio, y
-  `khipu-client-android` usa Jetpack Compose, cuyo compilador va atado a la
-  versión de Kotlin. **No pude verificar si 2.27.0 es compatible con Kotlin
-  2.2.20.** Hay que confirmarlo con el equipo del SDK de Android antes de
-  publicar `4.0.0`; si no lo es, la línea de Capacitor 8 queda bloqueada
-  esperando un release de `khipu-client-android`.
+- **Compatibilidad de `khipu-client-android 2.27.0` con Kotlin 2.2.20 —
+  resuelto, ya no es bloqueante.** El riesgo original suponía que el SDK estaba
+  en Kotlin 1.9 con el compilador de Compose pinneado por separado. Esa premisa
+  es falsa. Verificado en el código fuente de `khipu-client-android` en el tag
+  `2.27.0`:
+
+  | Dato | Valor | Dónde |
+  | --- | --- | --- |
+  | Kotlin | **2.0.21** | `gradle/libs.versions.toml` |
+  | Compilador de Compose | plugin `org.jetbrains.kotlin.plugin.compose` con `version.ref = "kotlin"` | mismo archivo, sección `[plugins]` |
+  | AGP | 8.10.0 | mismo archivo |
+  | Java / jvmTarget | 17 | `khipuClient/build.gradle.kts` |
+  | compileSdk / minSdk | 35 / 21 | `khipuClient/build.gradle.kts` |
+
+  El propio `DEPENDENCY_UPDATE_PLAN.md` del SDK documenta la migración
+  `1.9.0 → 2.0.21`, anotando «Compatible binariamente», y explica que con
+  Kotlin 2.0+ el compilador de Compose queda integrado y versionado con Kotlin,
+  sin `kotlinCompilerExtensionVersion`. Su `CLAUDE.md` añade: «Requires Java 17
+  for compilation (consumers can use Java 11+)».
+
+  Con eso, las tres vías por las que el riesgo podía materializarse quedan
+  cerradas: no hay pinning de compilador de Compose que desalinear; un compilador
+  Kotlin 2.2.20 lee metadata de 2.0.21 (la dirección compatible es
+  nuevo-lee-viejo); y bytecode de Java 17 se consume sin problema desde una app
+  en Java 21.
+
+  Queda una verificación empírica de rutina, no una incógnita de diseño: el
+  `./gradlew assembleDebug` de la app de ejemplo en Capacitor 8. Ya está en el
+  plan como compuerta.
+
+- **El README del plugin recomienda Kotlin 1.9.0 a los comercios, y el SDK que
+  empaqueta está compilado con 2.0.21.** No es un riesgo de esta migración sino
+  un defecto del estado publicado hoy: un comercio que siga la instrucción del
+  README al pie de la letra queda un major de Kotlin por detrás de la biblioteca
+  que consume, y esa es la dirección incompatible. Hay que verificar el
+  comportamiento real y subir la recomendación del README a al menos `2.0.21` en
+  **las tres líneas**, no solo en la de Capacitor 8.
 - **Recursos de `KhipuClientIOS` bajo SPM.** Su `Package.swift` declara
   `resources: [.process("Assets")]`, lo que genera un resource bundle. La carga
   de esos recursos dentro de una app de Capacitor construida con SPM solo se

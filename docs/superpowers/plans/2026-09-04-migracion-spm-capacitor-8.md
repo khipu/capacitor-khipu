@@ -1516,6 +1516,12 @@ Insertar justo después del título `# capacitor-khipu` en `README.md`:
 > Ambas líneas soportan CocoaPods y Swift Package Manager.
 ```
 
+Y en la sección *Jetpack compose and Kotlin* del mismo README, subir la recomendación
+de `org.jetbrains.kotlin:kotlin-gradle-plugin` de `1.9.0` a `2.0.21`, que es la versión
+con la que está compilado el `khipu-client-android 2.27.0` que esta línea empaqueta.
+Recomendar 1.9.0 deja al comercio un major de Kotlin por detrás de la biblioteca que
+consume.
+
 - [ ] **Step 4: Fijar la versión y verificar**
 
 ```bash
@@ -3040,13 +3046,15 @@ Comprobar a mano, con un `operationId` válido:
 
 - [ ] **Step 6: Compuerta bloqueante — Kotlin 2.2.20 contra `khipu-client-android`**
 
-Este es el riesgo del spec que no depende de nosotros. Capacitor 8 exige Kotlin
-2.2.20 en la app del comercio, `khipu-client-android` usa Jetpack Compose, y el
-compilador de Compose va atado a la versión de Kotlin. **No está verificado que
-2.27.0 sea compatible con Kotlin 2.2.20.**
+Esto era el riesgo bloqueante del spec y **ya está resuelto en el papel**: se
+verificó en el código fuente de `khipu-client-android` en el tag `2.27.0` que el SDK
+está en **Kotlin 2.0.21**, no en 1.9, y que usa el plugin
+`org.jetbrains.kotlin.plugin.compose` versionado con Kotlin, o sea sin
+`kotlinCompilerExtensionVersion` que desalinear. Su `jvmTarget` es 17, consumible
+desde una app en Java 21. Un compilador Kotlin 2.2.20 lee metadata de 2.0.21 sin
+problema, que es la dirección compatible.
 
-La app de ejemplo en Capacitor 8 es justamente el lugar donde eso se compila, así
-que este build es la verificación real:
+Lo que queda es la confirmación empírica de rutina:
 
 ```bash
 cd /Users/edavis/git/capacitor-khipu/example
@@ -3056,12 +3064,11 @@ cd android && ./gradlew clean assembleDebug && cd ..
 
 Expected: el build pasa y `kotlin-gradle-plugin` reporta 2.2.20.
 
-**Si falla con un error del compilador de Compose o de metadata de Kotlin:
-detenerse acá.** No hay arreglo del lado del plugin. Hay que escalarlo al equipo
-del SDK de Android de Khipu y esperar un release de `khipu-client-android`
-compatible. En ese caso, las Tasks 15 y 16 quedan bloqueadas, la línea 4.x no se
-publica, y `3.0.0` con dist-tag `cap7` queda como la versión recomendada mientras
-tanto. Registrar el hallazgo en el spec antes de parar.
+**Si falla con un error del compilador de Compose o de metadata de Kotlin**, es un
+hallazgo inesperado que contradice la evidencia del código fuente: registrarlo con la
+salida completa y escalarlo al equipo del SDK de Android antes de seguir. Dado lo
+verificado, el fallo más probable no sería de Kotlin sino de AGP o del SDK de
+Android, así que revisar primero esas versiones.
 
 - [ ] **Step 7: Correr el harness en un emulador de Android**
 
@@ -3141,6 +3148,14 @@ que se le pide al comercio, que en Capacitor 8 es 2.2.20:
 ```
         classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.20'
 ```
+
+**Y arreglar un defecto del estado publicado hoy, que no es de esta migración:** el
+README recomienda `1.9.0`, mientras que `khipu-client-android 2.27.0` está compilado
+con **Kotlin 2.0.21** (verificado en `gradle/libs.versions.toml` de su tag). Un
+comercio que siga el README al pie de la letra queda un major de Kotlin por detrás de
+la biblioteca que consume, que es la dirección incompatible. La corrección aplica a
+**las tres líneas**, así que la línea 2.x (Task 5) y la 3.x (branch `7.x`) también
+deben subir su recomendación a al menos `2.0.21`.
 
 - [ ] **Step 3b: Anclar `release-it` a `main`**
 
