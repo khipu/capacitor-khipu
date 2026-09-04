@@ -80,7 +80,15 @@
   "swiftlint": "@ionic/swiftlint-config",
   "eslintConfig": {
     "root": true,
-    "extends": "@ionic/eslint-config/recommended"
+    "extends": "@ionic/eslint-config/recommended",
+    "overrides": [
+      {
+        "files": ["**/*.js"],
+        "rules": {
+          "@typescript-eslint/explicit-module-boundary-types": "off"
+        }
+      }
+    ]
   },
   "capacitor": {
     "ios": {

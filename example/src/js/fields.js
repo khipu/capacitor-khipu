@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /**
  * Única fuente de verdad de los campos que el harness puede enviar. Refleja la
  * interfaz `KhipuOptions` de `src/definitions.ts`.

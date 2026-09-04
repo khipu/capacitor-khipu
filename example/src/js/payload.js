@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /**
  * Construye el payload de `Khipu.startOperation` a partir del estado del
  * formulario.
