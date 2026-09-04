@@ -16,10 +16,13 @@
  */
 import { readFileSync } from 'node:fs';
 
-const CONTRATO = 'src/definitions.ts';
-const SWIFT = 'ios/Sources/KhipuPlugin/KhipuOptionsMapper.swift';
-const JAVA = 'android/src/main/java/com/khipu/capacitor/KhipuPlugin.java';
-const HARNESS = 'example/src/js/fields.js';
+// Acepta un directorio base para poder testear con fixtures, igual que la guarda de
+// versiones acepta rutas por argv.
+const BASE = process.argv[2] ?? '.';
+const CONTRATO = `${BASE}/src/definitions.ts`;
+const SWIFT = `${BASE}/ios/Sources/KhipuPlugin/KhipuOptionsMapper.swift`;
+const JAVA = `${BASE}/android/src/main/java/com/khipu/capacitor/KhipuPlugin.java`;
+const HARNESS = `${BASE}/example/src/js/fields.js`;
 
 const leer = (path) => readFileSync(path, 'utf8');
 const claves = (fuente, patron) => new Set([...fuente.matchAll(patron)].map((m) => m[1]));
