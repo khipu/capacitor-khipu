@@ -39,7 +39,7 @@
     "verify:web": "npm run build",
     "lint": "npm run eslint && npm run prettier -- --check && npm run swiftlint -- lint",
     "fmt": "npm run eslint -- --fix && npm run prettier -- --write && npm run swiftlint -- --fix --format",
-    "eslint": "eslint . --ext ts",
+    "eslint": "eslint . --ext ts,mjs --max-warnings 0",
     "prettier": "prettier \"**/*.{css,html,ts,js,java}\" --plugin=prettier-plugin-java",
     "swiftlint": "node-swiftlint",
     "docgen": "docgen --api KhipuPlugin --output-readme README.md --output-json dist/docs.json",
@@ -94,6 +94,12 @@
         },
         "env": {
           "browser": true
+        }
+      },
+      {
+        "files": ["scripts/**", "*.mjs"],
+        "env": {
+          "node": true
         }
       }
     ]
