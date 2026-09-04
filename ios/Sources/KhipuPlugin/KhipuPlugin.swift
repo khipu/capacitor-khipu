@@ -19,11 +19,13 @@ public class KhipuPlugin: CAPPlugin, CAPBridgedPlugin {
 
         let options = KhipuOptionsMapper.map(call.getObject("options"))
 
-        guard let presenter = self.bridge?.viewController else {
-            handleError(call, "new viewController in the bridge.")
+        guard let bridgeController = self.bridge?.viewController else {
+            handleError(call, "no viewController in the bridge.")
             return
         }
+
         DispatchQueue.main.async {
+            let presenter = Self.topMost(from: bridgeController)
             KhipuLauncher.launch(presenter: presenter,
                                  operationId: operationId,
                                  options: options) { result in
@@ -52,6 +54,24 @@ public class KhipuPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
 
+    }
+
+    /// Devuelve el controlador que está efectivamente arriba, siguiendo la cadena de
+    /// presentación desde el que da el puente.
+    ///
+    /// UIKit rechaza presentar sobre un controlador que ya está presentando, así que
+    /// sin esto el pago no aparece cuando el comercio tiene su propio modal en
+    /// pantalla.
+    ///
+    /// Deliberadamente NO es una extensión de `UIViewController`: el plugin se enlaza
+    /// estáticamente en la app del comercio, y un nombre como `topMostViewController`
+    /// inyectado ahí puede chocar con el suyo.
+    static func topMost(from controller: UIViewController) -> UIViewController {
+        var top = controller
+        while let presented = top.presentedViewController {
+            top = presented
+        }
+        return top
     }
 
     private func handleError(_ call: CAPPluginCall, _ message: String, _ error: Error? = nil) {
