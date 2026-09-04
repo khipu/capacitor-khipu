@@ -86,6 +86,9 @@
         "files": ["**/*.js"],
         "rules": {
           "@typescript-eslint/explicit-module-boundary-types": "off"
+        },
+        "env": {
+          "browser": true
         }
       }
     ]
