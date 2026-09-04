@@ -354,6 +354,7 @@ líneas en paralelo.
 | iOS tests | `xcodebuild test -scheme CapacitorKhipu-Package` en simulador |
 | Android | `cd android && ./gradlew clean build test` |
 | sync de versión | script que falla si `KhipuClientIOS` difiere entre `Package.swift` y el podspec |
+| sync de claves | script que falla si el vocabulario de opciones deriva entre `definitions.ts`, el mapper de Swift, el plugin de Java y el harness |
 | podspec | `pod lib lint --allow-warnings` |
 | app de ejemplo | build completo, solo en push a `main` y `7.x` |
 

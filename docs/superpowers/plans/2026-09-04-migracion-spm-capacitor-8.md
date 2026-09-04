@@ -66,6 +66,7 @@ Java + Gradle, Vitest + jsdom, XCTest, GitHub Actions.
 | `vitest.config.ts` | configuración de tests JS (entorno jsdom, qué archivos incluir) |
 | `.nvmrc` | versión de Node del proyecto (`22`), espejo de `engines` |
 | `scripts/check-native-versions.mjs` | guarda que impide que el podspec y `Package.swift` se desincronicen |
+| `scripts/check-option-keys.mjs` | guarda que impide que el vocabulario de opciones derive entre sus cuatro superficies |
 | `.github/workflows/ci.yml` | lint, tests, builds de iOS y Android, build de la app de ejemplo |
 
 **iOS** (`ios/Sources/KhipuPlugin/`)
@@ -2473,11 +2474,193 @@ git checkout CapacitorKhipu.podspec
 
 Expected: imprime el mensaje de desincronizado y después `la guarda funcionó`.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Escribir el test de la guarda de claves**
+
+Segunda guarda, del mismo tipo y por la misma razón: hay un invariante que nada
+asegura. El contrato entre JS y el código nativo es de strings, y el mismo conjunto de
+claves vive en **cuatro** superficies. Si alguien renombra una clave en una sola, el
+flag deja de funcionar **en silencio**: los tests de JS asertan sobre el payload y los
+de Swift sobre el mapeo, pero ninguno verifica que ambos lados hablen del mismo
+vocabulario.
+
+Verificado antes de escribir esta tarea: hoy las cuatro coinciden, 9 claves de opciones
+y 12 de colores. La guarda previene deriva futura, no arregla algo roto.
+
+Crear `scripts/check-option-keys.test.mjs`:
+
+```js
+import { execFileSync } from 'node:child_process';
+import { describe, expect, it } from 'vitest';
+
+const SCRIPT = 'scripts/check-option-keys.mjs';
+
+function run() {
+  try {
+    return { code: 0, output: execFileSync('node', [SCRIPT], { encoding: 'utf8' }) };
+  } catch (error) {
+    return { code: error.status, output: `${error.stdout}${error.stderr}` };
+  }
+}
+
+describe('check-option-keys', () => {
+  it('las cuatro superficies declaran el mismo vocabulario', () => {
+    const result = run();
+
+    expect(result.output).toContain('9 opciones');
+    expect(result.output).toContain('12 colores');
+    expect(result.code).toBe(0);
+  });
+});
+```
+
+- [ ] **Step 8: Escribir la guarda de claves**
+
+Crear `scripts/check-option-keys.mjs`:
+
+```js
+#!/usr/bin/env node
+/**
+ * Falla si las cuatro superficies que declaran el vocabulario de opciones dejan de
+ * coincidir.
+ *
+ * El contrato entre JS y el nativo es de strings: `src/definitions.ts` lo declara, el
+ * mapper de Swift y el plugin de Java lo leen, y el harness lo ofrece. Renombrar una
+ * clave en una sola superficie deja el flag sin efecto **en silencio** — ningún test de
+ * un lado puede detectar una deriva del otro.
+ *
+ * Sobre la fragilidad: esto parsea fuente con expresiones regulares. La dirección del
+ * fallo es la correcta (el chequeo se rompe y alguien mira, en vez de pasar mientras el
+ * protocolo derivó), pero un parser roto podría reportar «todas coinciden» con cero
+ * claves en todas. Por eso hay un piso de cordura: si la extracción del contrato
+ * devuelve menos claves de las que debería, el problema es el parser y se dice así.
+ */
+import { readFileSync } from 'node:fs';
+
+const CONTRATO = 'src/definitions.ts';
+const SWIFT = 'ios/Sources/KhipuPlugin/KhipuOptionsMapper.swift';
+const JAVA = 'android/src/main/java/com/khipu/capacitor/KhipuPlugin.java';
+const HARNESS = 'example/src/js/fields.js';
+
+const leer = (path) => readFileSync(path, 'utf8');
+const claves = (fuente, patron) => new Set([...fuente.matchAll(patron)].map((m) => m[1]));
+const sinColors = (conjunto) => new Set([...conjunto].filter((k) => k !== 'colors'));
+
+function interfaz(fuente, nombre) {
+  const bloque = fuente.match(new RegExp(`export interface ${nombre} \\{(.*?)\\n\\}`, 's'));
+  if (!bloque) {
+    console.error(
+      `No se pudo extraer la interfaz ${nombre} de ${CONTRATO}. El parser de esta guarda quedó obsoleto.`,
+    );
+    process.exit(1);
+  }
+  return claves(bloque[1], /^\s*(\w+)\s*[?:]/gm);
+}
+
+const contrato = leer(CONTRATO);
+const opciones = sinColors(interfaz(contrato, 'KhipuOptions'));
+const colores = interfaz(contrato, 'KhipuColors');
+
+// Piso de cordura: si el contrato se lee casi vacío, lo roto es el parser, no el código.
+if (opciones.size < 5 || colores.size < 8) {
+  console.error(
+    `La extracción del contrato devolvió ${opciones.size} opciones y ${colores.size} colores, ` +
+      `muy pocas para ser real. El parser de esta guarda quedó obsoleto: arréglalo en vez de ` +
+      `confiar en que las superficies coinciden.`,
+  );
+  process.exit(1);
+}
+
+const swift = leer(SWIFT);
+const java = leer(JAVA);
+const tramos = leer(HARNESS).split('export const COLOR_FIELDS');
+
+const superficies = [
+  { nombre: `${SWIFT} (opciones)`, esperado: opciones, real: sinColors(claves(swift, /options\["(\w+)"\]/g)) },
+  { nombre: `${SWIFT} (colores)`, esperado: colores, real: claves(swift, /colors\["(\w+)"\]/g) },
+  { nombre: `${JAVA} (opciones)`, esperado: opciones, real: sinColors(claves(java, /options\.\w+\("(\w+)"/g)) },
+  { nombre: `${JAVA} (colores)`, esperado: colores, real: claves(java, /colors\.\w+\("(\w+)"/g) },
+  { nombre: `${HARNESS} (opciones)`, esperado: opciones, real: claves(tramos[0], /key: '(\w+)'/g) },
+  {
+    nombre: `${HARNESS} (colores)`,
+    esperado: colores,
+    real: claves(tramos[1].split('export const PRESETS')[0], /key: '(\w+)'/g),
+  },
+];
+
+let derivo = false;
+for (const { nombre, esperado, real } of superficies) {
+  const falta = [...esperado].filter((k) => !real.has(k));
+  const sobra = [...real].filter((k) => !esperado.has(k));
+  if (falta.length || sobra.length) {
+    derivo = true;
+    console.error(`${nombre} derivó del contrato de ${CONTRATO}:`);
+    if (falta.length) console.error(`  no lee/ofrece: ${falta.join(', ')}`);
+    if (sobra.length) console.error(`  lee/ofrece de más: ${sobra.join(', ')}`);
+  }
+}
+
+if (derivo) {
+  process.exit(1);
+}
+
+console.log(
+  `Vocabulario sincronizado en las cuatro superficies: ${opciones.size} opciones, ${colores.size} colores`,
+);
+```
+
+- [ ] **Step 9: Enchufar las dos guardas a los scripts de npm**
+
+En `package.json`:
+
+```json
+    "verify": "npm run test && npm run verify:versions && npm run verify:keys && npm run verify:ios && npm run verify:android && npm run verify:web",
+    "verify:versions": "node scripts/check-native-versions.mjs",
+    "verify:keys": "node scripts/check-option-keys.mjs",
+```
+
+- [ ] **Step 10: Correr las dos guardas y sus tests**
+
+```bash
+npm run verify:versions
+npm run verify:keys
+```
+
+Expected: `KhipuClientIOS sincronizado en 2.16.5` y
+`Vocabulario sincronizado en las cuatro superficies: 9 opciones, 12 colores`.
+
+Run: `PATH="/opt/homebrew/bin:$PATH" npx vitest run scripts/`
+
+Expected: los tests de las dos guardas pasan.
+
+- [ ] **Step 11: Comprobar a mano que las dos guardas muerden**
+
+Una guarda que no se probó fallando es una guarda sin verificar.
+
+```bash
+sed -i '' "s/'KhipuClientIOS', '2.16.5'/'KhipuClientIOS', '2.16.2'/" CapacitorKhipu.podspec
+npm run verify:versions
+git checkout CapacitorKhipu.podspec
+```
+
+Expected: imprime el mensaje de desincronizado y sale con código 1.
+
+```bash
+sed -i '' "s/key: 'showFooter'/key: 'showFooterX'/" example/src/js/fields.js
+npm run verify:keys
+git checkout example/src/js/fields.js
+```
+
+Expected: reporta que el harness derivó, nombrando `showFooter` como no ofrecido y
+`showFooterX` como de más, y sale con código 1.
+
+Confirmar con `git status --short` que el working tree quedó limpio después de los dos
+`git checkout`.
+
+- [ ] **Step 12: Commit**
 
 ```bash
 git add scripts package.json
-git commit -m "chore: guarda que impide desincronizar KhipuClientIOS entre SPM y CocoaPods"
+git commit -m "chore: guard the KhipuClientIOS version and the option key contract"
 ```
 
 ---
@@ -2672,6 +2855,7 @@ jobs:
       - run: npm run prettier -- --check
       - run: npm test
       - run: npm run verify:versions
+      - run: npm run verify:keys
       - run: npm run verify:web
 
   ios:
