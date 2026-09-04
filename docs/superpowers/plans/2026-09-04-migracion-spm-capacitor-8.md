@@ -2403,8 +2403,25 @@ git commit -m "chore: guarda que impide desincronizar KhipuClientIOS entre SPM y
 ```bash
 cd example
 npm install @capacitor/core@^7 @capacitor/ios@^7 @capacitor/android@^7 @capacitor/splash-screen@^7
-npm install --save-dev @capacitor/cli@^7
+npm install --save-dev @capacitor/cli@^7 vite@latest
 ```
+
+El `vite` del ejemplo está pinneado en `^2.9.13`, cuatro majors atrás, y su build de
+producción **ya está roto** antes de esta migración: el `dist/esm/index.js` del plugin
+hace `import('./web')` dinámico, Vite inyecta un helper de module-preload para eso, y
+`vite@2.9.18` no resuelve su propio `./preload-helper` bajo la resolución de exports
+más estricta de Node moderno. El servidor de desarrollo (`npm start`) sí funciona; solo
+`vite build` falla. Hay que subirlo en esta tarea o el step de build del CI no puede
+pasar.
+
+Verificar antes de seguir:
+
+```bash
+npm run build
+```
+
+Expected: `vite build` completa sin errores y escribe `dist/`. Si falla en algo que no
+sea el `preload-helper`, detenerse: significa que hay un import roto en el harness.
 
 - [ ] **Step 2: Regenerar las plataformas nativas**
 
@@ -2943,8 +2960,12 @@ bajo SPM, y si nos afecta el issue `ionic-team/capacitor#8325`.
 ```bash
 cd example
 npm install @capacitor/core@^8 @capacitor/ios@^8 @capacitor/android@^8 @capacitor/splash-screen@^8
-npm install --save-dev @capacitor/cli@^8
+npm install --save-dev @capacitor/cli@^8 vite@latest
+npm run build
 ```
+
+Expected: `vite build` completa sin errores. Si la Task 10 ya subió `vite`, acá solo se
+confirma; si no, ver la nota de esa tarea sobre el `preload-helper` de `vite@2`.
 
 - [ ] **Step 2: Regenerar las plataformas nativas con SPM**
 
