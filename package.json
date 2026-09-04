@@ -73,8 +73,8 @@
   "peerDependencies": {
     "@capacitor/core": "^5.0.0 || ^6.0.0 || ^7.0.0"
   },
-  "overrides": {
-    "@types/node": "^14.18.0"
+  "engines": {
+    "node": ">=22.0.0"
   },
   "prettier": "@ionic/prettier-config",
   "swiftlint": "@ionic/swiftlint-config",
