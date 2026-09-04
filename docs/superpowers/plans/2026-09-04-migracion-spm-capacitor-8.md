@@ -2616,6 +2616,17 @@ El `node-version: 22` no es arbitrario: `@capacitor/cli@8.5.1` declara
 `"engines": { "node": ">=22.0.0" }`, y el tooling de test (Vitest 5, jsdom 30)
 también lo exige en runtime. La Task 1 deja `engines` y `.nvmrc` declarándolo.
 
+Los dos steps previos al lint de Swift no son ceremonia: `npx node-swiftlint lint`
+**sale con código 0 y solo imprime un warning** cuando SwiftLint no está en el PATH
+(verificado en local). Sin ellos, el step pasaría en verde sin lintear una sola línea
+de Swift — un chequeo que no chequea nada. El `swiftlint version` falla ruidosamente si
+falta, que es el comportamiento que se quiere.
+
+Por la misma razón, el `npm run lint` del job web **no** cubre Swift: ese script
+encadena `eslint && prettier --check && swiftlint lint`, y su tercer tramo es el que
+puede no-opear. El job web corre solo los dos primeros por separado (ver R2 del
+ledger), y Swift se lintea acá.
+
 **Nota realista:** es esperable que el primer run necesite ajustes (nombres de
 simulador disponibles en el runner, versiones del Android SDK). Iterar sobre el
 workflow hasta que pase es parte de la tarea, no una señal de que el diseño esté mal.
@@ -2667,6 +2678,10 @@ jobs:
         run: xcodebuild build -scheme CapacitorKhipu -destination generic/platform=iOS
       - name: Tests del paquete
         run: xcodebuild test -scheme CapacitorKhipu-Package -destination 'platform=iOS Simulator,name=iPhone 16'
+      - name: Instalar SwiftLint
+        run: brew list swiftlint || brew install swiftlint
+      - name: Confirmar que SwiftLint existe
+        run: swiftlint version
       - name: Lint de Swift
         run: npm run swiftlint -- lint
       - name: Lint del podspec
