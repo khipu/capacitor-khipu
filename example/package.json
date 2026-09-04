@@ -14,14 +14,14 @@
     "start-demos": "npm run build && npx cap sync"
   },
   "dependencies": {
-    "@capacitor/android": "^7.6.9",
-    "@capacitor/core": "^7.6.9",
-    "@capacitor/ios": "^7.6.9",
-    "@capacitor/splash-screen": "^7.0.5",
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/ios": "^8.5.1",
+    "@capacitor/splash-screen": "^8.0.2",
     "capacitor-khipu": "file:.."
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.6.9",
+    "@capacitor/cli": "^8.5.1",
     "vite": "^8.2.2"
   },
   "author": "",
