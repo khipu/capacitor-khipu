@@ -2838,6 +2838,15 @@ Comprobar a mano, con un `operationId` válido:
 - el preset *Marca Khipu* aplica el púrpura `#8347AD` a la barra superior;
 - `showFooter` incluido en `false` oculta el footer, y sin incluir lo deja visible;
 - `skipExitSuccessPage` en `true` salta la página de salida;
+- **el plugin de Kotlin ya no está en el ejemplo, así que fíjate si la UI de pago
+  renderiza igual.** `npx cap add android` regeneró el proyecto sin
+  `apply plugin: 'org.jetbrains.kotlin.android'` ni su classpath, que es lo que el README
+  le pide a cada comercio. Ya está verificado que **compila** sin él
+  (`gradlew -p example/android assembleDebug` → `BUILD SUCCESSFUL`, 141 tareas, APK
+  generado), pero compilar no prueba que renderice. Si la pantalla de pago aparece
+  normal, la instrucción del README sobre Kotlin **es innecesaria y hay que quitarla de
+  las tres líneas** — sería un paso menos de integración para cada comercio. Si no
+  aparece, el plugin de Kotlin sí hace falta y hay que devolverlo al ejemplo;
 - al terminar, el resultado se renderiza con sus campos y la tabla de eventos;
 - comparar los campos del resultado con la corrida de la otra plataforma: deben
   aparecer los mismos. Es la única forma de detectar que iOS y Android discrepen sobre
@@ -3476,7 +3485,10 @@ Android, así que revisar primero esas versiones.
 npx cap run android
 ```
 
-Comprobar los mismos puntos que en iOS, menos el del resource bundle.
+Comprobar los mismos puntos que en iOS, menos el del resource bundle. Y el mismo
+punto sobre Kotlin que la Task 10: el ejemplo ya no lleva
+`apply plugin: 'org.jetbrains.kotlin.android'`, está verificado que compila sin él, y
+si la UI de pago renderiza, la instrucción del README sobre Kotlin sobra.
 
 - [ ] **Step 8: Commit**
 
