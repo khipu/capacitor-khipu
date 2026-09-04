@@ -39,7 +39,7 @@ export interface KhipuResult {
   operationId: string;
   exitTitle: string;
   exitMessage: string;
-  exitUrl: string;
+  exitUrl: string | undefined;
   result: 'OK' | 'ERROR' | 'WARNING' | 'CONTINUE';
   failureReason: string | undefined;
   continueUrl: string | undefined;
