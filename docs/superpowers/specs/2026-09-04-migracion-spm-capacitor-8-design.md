@@ -155,14 +155,22 @@ dependencias están fijadas con `.exact` con un comentario que dice exactamente
 eso.
 
 **Corrección: fijar `KhipuClientIOS` exacto no hace idénticos los dos grafos, y no
-hay que prometerlo.** `Starscream` no es dependencia declarada de
-`KhipuClientIOS`: llega por vía transitiva a través de `socket.io-client-swift`,
-que en su `Package.swift` de la versión 16.1.1 la declara como
-`.upToNextMajor(from: "4.0.8")`, o sea `>=4.0.8 <5.0.0`. Por CocoaPods el mismo
-pod la declara como `~> 4.0.8`, o sea `>=4.0.8 <4.1.0`. Verificado en el
-`Package.swift` del tag `v16.1.1` de `socketio/socket.io-client-swift` y en el
-`Podfile.lock` de la app de ejemplo. El fijado exacto de `2.16.5` estrecha la
-diferencia a las tres dependencias que `KhipuClientIOS` declara, pero no la cierra.
+hay que prometerlo.** La divergencia está en `Starscream`, y la causa es que
+`KhipuClientIOS` la declara en su podspec pero no en su `Package.swift`:
+
+| | Quién declara `Starscream` | Restricción efectiva |
+| --- | --- | --- |
+| CocoaPods | `KhipuClientIOS.podspec:27` con `'4.0.8'` (sin operador, exacto), más `Socket.IO-Client-Swift.podspec:30` con `'~> 4.0.8'` | intersección = **`4.0.8`**, fijado por declaración |
+| SPM | nadie en `KhipuClientIOS`; solo `socket.io-client-swift/Package.swift:11` con `.upToNextMajor(from: "4.0.8")` | **`>=4.0.8 <5.0.0`**, flota en 4.x |
+
+Verificado en los tags `2.16.5` de `khipu/KhipuClientIOS` y `v16.1.1` de
+`socketio/socket.io-client-swift`.
+
+O sea que la asimetría es fijado contra flotante, no rango contra rango: por
+CocoaPods la versión queda determinada por las declaraciones, no solo por el
+`Podfile.lock`. El `Package.swift` de `KhipuClientIOS` fija con `.exact` sus tres
+dependencias de producción declaradas, lo que estrecha la diferencia, pero al no
+declarar `Starscream` deja ese borde abierto en la ruta SPM.
 
 Contrapartida aceptada: si la app del comercio declara además `KhipuClientIOS`
 en otra versión, SPM falla con un conflicto duro en vez de negociar una versión

@@ -1802,6 +1802,15 @@ declaran sin modificador de acceso, o sea `internal` al módulo del SDK, y
 un test no puede asertar contra el objeto ya construido. `draft(from:)` concentra
 toda la lógica y es lo que se testea; `apply(_:)` es mecánico, una línea por campo.
 
+**Hueco aceptado a propósito, documentado para que sea revisable.** Los tests cubren
+`draft(from:)`, no `apply(_:)`. Si alguien intercambiara `lightPrimary` por
+`lightOnPrimary` en el paso mecánico, los tests seguirían pasando. Se acepta porque
+`apply(_:)` es una línea por campo, visualmente alineada, y la revisión de código lo
+cubre a ese tamaño. **El límite:** en el momento en que `apply(_:)` gane un
+condicional, una transformación o una rama, deja de ser defendible y necesita tests
+propios. Dejar esta nota como comentario en `KhipuOptionsMapper.swift`, sobre
+`apply(_:)`, no solo en este plan.
+
 - [ ] **Step 1: Escribir los tipos intermedios**
 
 Crear `ios/Sources/KhipuPlugin/KhipuOptionsDraft.swift`:
