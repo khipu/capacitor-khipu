@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 @testable import KhipuPlugin
@@ -19,19 +20,31 @@ final class KhipuPluginTests: XCTestCase {
         XCTAssertEqual(plugin.pluginMethods.first?.returnType, "promise")
     }
 
-    func testTopMostSigueLaCadenaDePresentacion() {
-        let root = UIViewController()
-        let window = UIWindow(frame: UIScreen.main.bounds)
-        window.rootViewController = root
-        window.makeKeyAndVisible()
+    /// Doble que permite armar una cadena de presentación sin presentar nada.
+    ///
+    /// `present(_:animated:)` no es fiable en un test target de SwiftPM sin app
+    /// anfitriona: falla por timeout. En vez de crear la condición real, se
+    /// sobreescribe la propiedad que `topMost` consulta. Lo que se testea es nuestro
+    /// recorrido de la cadena, no el comportamiento de UIKit.
+    private final class ControladorConPresentado: UIViewController {
+        var presentado: UIViewController?
+        override var presentedViewController: UIViewController? { presentado }
+    }
 
-        XCTAssertIdentical(KhipuPlugin.topMost(from: root), root)
+    func testTopMostDevuelveElMismoControladorCuandoNoHayNadaPresentado() {
+        let solo = ControladorConPresentado()
 
-        let modal = UIViewController()
-        let presentado = expectation(description: "modal presentado")
-        root.present(modal, animated: false) { presentado.fulfill() }
-        wait(for: [presentado], timeout: 5)
+        XCTAssertIdentical(KhipuPlugin.topMost(from: solo), solo)
+    }
 
-        XCTAssertIdentical(KhipuPlugin.topMost(from: root), modal)
+    func testTopMostSigueLaCadenaHastaElUltimoPresentado() {
+        let raiz = ControladorConPresentado()
+        let intermedio = ControladorConPresentado()
+        let ultimo = UIViewController()
+
+        raiz.presentado = intermedio
+        intermedio.presentado = ultimo
+
+        XCTAssertIdentical(KhipuPlugin.topMost(from: raiz), ultimo)
     }
 }
