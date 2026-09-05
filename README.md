@@ -10,16 +10,20 @@ Capacitor plugin for Khipu
 > | --- | --- | --- | --- |
 > | 8 | 4.x | `npm install capacitor-khipu` | maintained |
 > | 7 | 3.x | `npm install capacitor-khipu@cap7` | maintained |
-> | 5 and 6 | 2.11.2 | `npm install capacitor-khipu@cap6` | end of support |
+> | 5 and 6 | 2.11.3 | `npm install capacitor-khipu@cap6` | end of support |
 >
 > The 3.x and 4.x lines support both CocoaPods and Swift Package Manager.
 
 ## Install
 
 ```bash
-npm install capacitor-khipu
+npm install capacitor-khipu@cap6
 npx cap sync
 ```
+
+The `@cap6` tag is not optional. `npm install capacitor-khipu` resolves to `latest`,
+which is the Capacitor 8 line and will fail to install next to Capacitor 5 or 6 with an
+`ERESOLVE` error.
 
 ## iOS setup
 
@@ -68,15 +72,71 @@ Note that google() and mavenCentral() repos are usually already added.
 
 ### Kotlin
 
-**You do not need to add Kotlin to your app for Khipu.** The Android SDK ships its
-Jetpack Compose UI already compiled inside the AAR, and the Compose runtime arrives as
-a transitive dependency, so a plain Java Capacitor app consumes it without applying the
-Kotlin Gradle plugin.
+**On this line you do need the Kotlin Gradle plugin**, even if your app is plain Java.
+Add it to `android/build.gradle`:
 
-**If your app already uses Kotlin** for its own reasons, use **2.0.21 or newer**.
-`khipu-client-android` is compiled with Kotlin 2.0.21, and a Kotlin 1.9 compiler cannot
-read 2.0 metadata — your build will fail with a version error when your own Kotlin
-sources resolve against the SDK's classpath.
+```gradle
+buildscript {
+    dependencies {
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21'
+    }
+}
+```
+
+and apply it in `android/app/build.gradle`:
+
+```gradle
+apply plugin: 'org.jetbrains.kotlin.android'
+```
+
+**Use 2.0.21 or newer.** Kotlin 1.9.0 fails outright under JDK 21 with
+`Unknown Kotlin JVM target: 21`, and even where it configures it cannot read the 2.0
+metadata that `khipu-client-android` is compiled with.
+
+Without the plugin your build fails with hundreds of `Duplicate class
+androidx.compose.ui.*` errors. The reason is that `androidx.compose.ui:ui` is a
+multiplatform module: nothing requests the `org.jetbrains.kotlin.platform.type`
+attribute unless the Kotlin plugin is applied, so Gradle resolves the `jvmstubs`
+variant while other paths pull `ui-android`, and the two collide.
+
+This is really about the Android Gradle Plugin, not about Capacitor. AGP 8.7 and newer
+request that attribute on their own, and Capacitor 6 defaults to AGP 8.2.1. If you have
+already moved your app to AGP 8.7 or newer you can skip the Kotlin plugin. Both paths
+are verified on a Capacitor 6 app built from scratch:
+
+| AGP | Kotlin plugin | Result |
+| --- | --- | --- |
+| 8.2.1 (Capacitor 6 default) | none | fails, duplicate Compose classes |
+| 8.2.1 | 1.9.0 | fails, `Unknown Kotlin JVM target: 21` |
+| 8.2.1 | 2.0.21 | builds |
+| 8.7.2 | none | builds |
+
+## Usage
+
+The plugin exports a single object, `Khipu`:
+
+```typescript
+import { Khipu } from 'capacitor-khipu';
+import type { KhipuResult } from 'capacitor-khipu';
+
+const result: KhipuResult = await Khipu.startOperation({
+  operationId: '<the operation id you got from the Khipu API>',
+  options: {
+    title: 'My store',
+    theme: 'system',
+  },
+});
+
+if (result.result === 'OK') {
+  // payment completed
+}
+```
+
+Every key inside `options` is optional, and leaving one out is not the same as sending
+it: when the key is absent the native SDK applies its own default. Only send what you
+actually want to override.
+
+`result.exitUrl` can come back empty on real payments, so check it before using it.
 
 ## API
 
