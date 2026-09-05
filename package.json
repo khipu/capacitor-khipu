@@ -97,7 +97,10 @@
         }
       },
       {
-        "files": ["scripts/**", "*.mjs"],
+        "files": [
+          "scripts/**",
+          "*.mjs"
+        ],
         "env": {
           "node": true
         }
@@ -120,10 +123,12 @@
   "release-it": {
     "git": {
       "commitMessage": "chore: release ${version}",
-      "tagName": "v${version}"
+      "tagName": "v${version}",
+      "requireBranch": "7.x"
     },
     "npm": {
-      "publish": true
+      "publish": true,
+      "tag": "cap7"
     },
     "github": {
       "release": true
