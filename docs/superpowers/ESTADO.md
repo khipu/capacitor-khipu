@@ -215,13 +215,16 @@ diferencia habría quedado escondida hasta que un comercio la reportara.
 
 ## Worktrees de trabajo
 
-Quedaron dos, y se pueden borrar cuando ya no se usen:
+Ya no hay ninguno: los dos se borraron el 2026-09-05, una vez publicadas las tres
+líneas. Los branches `7.x` y `release/2.x` siguen intactos en local y en `origin`; lo
+que se borró son solo los directorios de trabajo.
+
+Si hace falta volver a tocar una línea que no es `main`:
 
 ```
-git worktree remove .claude/worktrees/verify-7x
-git worktree remove .claude/worktrees/release-2x
+git worktree add .claude/worktrees/<nombre> <branch>
 ```
 
-`.claude/` está en el `.gitignore` (commit `d3f2a54`) porque los worktrees viven ahí,
-o sea dentro del repo, y sin eso prettier y eslint escanean una copia completa del
+`.claude/` está en el `.gitignore` (commit `d3f2a54`) porque los worktrees viven ahí, o
+sea dentro del repo, y sin eso prettier y eslint escanean una copia completa del
 proyecto y fallan sobre archivos generados.
