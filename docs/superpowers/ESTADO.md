@@ -62,6 +62,30 @@ Los tres branches están **empujados a `origin`**. Nada se ha publicado en npm.
   harness). Las dos tienen tests de su camino de fallo, no solo del de éxito.
 - **CI en GitHub Actions**, el primero del repo, corriendo en `main` y `7.x`.
 
+### El CI, verde en las dos líneas mantenidas
+
+Corrió por primera vez el 2026-09-05 y falló en las dos, por la misma causa:
+`package.json` y `package-lock.json` desincronizados para el npm del runner. El lock se
+había generado con **npm 11.16 (Node 26)** y el CI usa **Node 22**, cuyo npm arma un
+árbol distinto; `npm ci` es estricto y falla, mientras `npm install` local no lo nota.
+Faltaban tres paquetes, todos peers opcionales que cuelgan de `git-semver-tags` bajo
+`release-it`: `conventional-commits-filter@5.0.0`, `conventional-commits-parser@6.4.0`
+y `@simple-libs/stream-utils@1.2.0`.
+
+Corregido en `ffb69ed` (`main`) y `55383fb` (`7.x`). **El fix no es cherry-pickeable
+entre líneas**: los árboles de dependencias difieren, así que cada branch necesita su
+propia regeneración.
+
+**Regla que se desprende, y que conviene respetar:** regenerar el lock con
+`~/.nvm/versions/node/v22.23.2/bin/npm install`, no con el Node de Homebrew.
+
+Los cuatro jobs pasan en ambas líneas. Los dos puntos que el plan anticipaba como
+posibles ajustes del runner **no se materializaron**: el destino del simulador sin `OS=`
+no fue ambiguo, y `xcodebuild` autocreó el esquema del ejemplo en el checkout limpio. No
+hay que tocar nada, pero si alguna vez se quejan, la salida sigue siendo fijar la
+versión de runtime que el runner tenga — **`OS=latest` no sirve**, `xcodebuild` lo
+rechaza, comprobado.
+
 ## Verificado en dispositivo
 
 | | Línea 7 (CocoaPods) | Línea 8 (SPM) |
@@ -81,29 +105,7 @@ logotipo y las fuentes cargan. Detalle en el spec.
 
 ## Qué falta
 
-### 1. Terminar de estabilizar el CI
-
-Corrió por primera vez el 2026-09-05 y **falló en `main`**. Causa diagnosticada y
-corregida en `ffb69ed`: `package.json` y `package-lock.json` estaban desincronizados
-para el npm del runner. El lock se había generado con **npm 11.16 (Node 26)** y el CI
-usa **Node 22**, cuyo npm arma un árbol distinto; `npm ci` es estricto y falla, mientras
-`npm install` local no lo nota.
-
-**Regla que se desprende, y que conviene respetar:** regenerar el lock con
-`~/.nvm/versions/node/v22.23.2/bin/npm install`, no con el Node de Homebrew.
-
-Quedan por ver los jobs que nunca llegaron a ejecutarse. Los dos puntos que el plan
-anticipa que pueden pedir ajuste en el runner:
-
-- El destino del simulador es `platform=iOS Simulator,name=iPhone 16` sin `OS=`. En una
-  máquina con varios runtimes hay que fijar la versión; en el runner suele haber uno
-  solo. Si se queja de ambigüedad, fijar la que el runner tenga. **`OS=latest` no
-  sirve**: `xcodebuild` lo rechaza, comprobado.
-- El proyecto del ejemplo no tiene esquema compartido en `xcshareddata/xcschemes/`;
-  `xcodebuild` normalmente los autocrea, pero es la clase de cosa que solo se manifiesta
-  en un checkout limpio.
-
-### 2. Publicar, en este orden
+### 1. Publicar, en este orden
 
 ```
 release/2.x →  npx release-it 2.11.2      sale con --tag cap6
@@ -120,7 +122,7 @@ registro y `latest` retrocedería a la línea congelada.
 equivocado**, incluida la instrucción de Kotlin que puede romperles el build. Si hay
 comercios integrándose, vale avisarles por otro canal.
 
-### 3. Pendientes menores, ninguno bloqueante
+### 2. Pendientes menores, ninguno bloqueante
 
 - **Verificar en Android que el modo oscuro mapea bien.** El camino de colores de
   Android es código Java distinto al de Swift, y solo se probó el claro.
