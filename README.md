@@ -8,7 +8,7 @@ Capacitor plugin for Khipu
 | --- | --- | --- | --- | --- | --- |
 | 8 | 4.x | `npm install capacitor-khipu` | 15 | 24 | mantenida |
 | 7 | 3.x | `npm install capacitor-khipu@cap7` | 14 | 23 | mantenida |
-| 5 y 6 | 2.11.2 | `npm install capacitor-khipu@cap6` | 13 | 22 | fin de soporte |
+| 5 y 6 | 2.11.3 | `npm install capacitor-khipu@cap6` | 13 | 22 | fin de soporte |
 
 Las líneas 3.x y 4.x soportan **CocoaPods y Swift Package Manager**. No hace falta
 ningún paso extra: el CLI de Capacitor usa el `Package.swift` o el
@@ -18,9 +18,13 @@ coexistir en un mismo proyecto iOS.
 ## Install
 
 ```bash
-npm install capacitor-khipu
+npm install capacitor-khipu@cap7
 npx cap sync
 ```
+
+The `@cap7` tag is not optional. `npm install capacitor-khipu` resolves to `latest`,
+which is the Capacitor 8 line and will fail to install next to Capacitor 7 with an
+`ERESOLVE` error.
 
 ## iOS setup
 
@@ -76,13 +80,52 @@ Jetpack Compose UI already compiled inside the AAR, and the Compose runtime arri
 a transitive dependency, so a plain Java Capacitor app consumes it without applying the
 Kotlin Gradle plugin.
 
-Verified on the example app in this repo, which has no Kotlin plugin: it assembles and
-the payment screen renders on both Capacitor 7 and Capacitor 8.
+What actually decides this is the Android Gradle Plugin, not Capacitor. `androidx.compose.ui:ui`
+is a multiplatform module, and something has to request the
+`org.jetbrains.kotlin.platform.type` attribute or Gradle resolves its `jvmstubs`
+variant and collides with the `ui-android` one that other paths pull, giving you
+hundreds of `Duplicate class androidx.compose.ui.*` errors. AGP 8.7 and newer request
+that attribute on their own; AGP 8.2 does not.
+
+Capacitor 7 defaults to AGP 8.7.2, so a plain Java app is fine. **If you have pinned an
+older AGP, apply the Kotlin plugin** as described below. Verified on a Capacitor 7 app
+built from scratch: AGP 8.7.2 with no Kotlin plugin assembles and the payment screen
+renders.
 
 **If your app already uses Kotlin** for its own reasons, use **2.0.21 or newer**.
 `khipu-client-android` is compiled with Kotlin 2.0.21, and a Kotlin 1.9 compiler cannot
 read 2.0 metadata — your build will fail with a version error when your own Kotlin
 sources resolve against the SDK's classpath.
+
+## Usage
+
+The plugin exports a single object, `Khipu`:
+
+```typescript
+import { Khipu } from 'capacitor-khipu';
+import type { KhipuResult } from 'capacitor-khipu';
+
+const result: KhipuResult = await Khipu.startOperation({
+  operationId: '<the operation id you got from the Khipu API>',
+  options: {
+    title: 'My store',
+    theme: 'system',
+  },
+});
+
+if (result.result === 'OK') {
+  // payment completed
+}
+```
+
+Every key inside `options` is optional, and leaving one out is not the same as sending
+it: when the key is absent the native SDK applies its own default. Only send what you
+actually want to override — and note that the defaults are not identical across
+platforms. `locale` is the one to watch: iOS falls back to `es_CL` while Android
+follows the phone's language, so the same payment can come up in different languages
+unless you send `locale` explicitly.
+
+`result.exitUrl` can come back empty on real payments, so check it before using it.
 
 ## API
 
