@@ -2,18 +2,18 @@
 
 Capacitor plugin for Khipu
 
-## Compatibilidad
+## Compatibility
 
-| Capacitor | Plugin | Se instala con | iOS mínimo | minSdk | Estado |
+| Capacitor | Plugin | Install with | Minimum iOS | minSdk | Status |
 | --- | --- | --- | --- | --- | --- |
-| 8 | 4.x | `npm install capacitor-khipu` | 15 | 24 | mantenida |
-| 7 | 3.x | `npm install capacitor-khipu@cap7` | 14 | 23 | mantenida |
-| 5 y 6 | 2.11.3 | `npm install capacitor-khipu@cap6` | 13 | 22 | fin de soporte |
+| 8 | 4.x | `npm install capacitor-khipu` | 15 | 24 | maintained |
+| 7 | 3.x | `npm install capacitor-khipu@cap7` | 14 | 23 | maintained |
+| 5 and 6 | 2.11.3 | `npm install capacitor-khipu@cap6` | 13 | 22 | end of support |
 
-Las líneas 3.x y 4.x soportan **CocoaPods y Swift Package Manager**. No hace falta
-ningún paso extra: el CLI de Capacitor usa el `Package.swift` o el
-`CapacitorKhipu.podspec` según el gestor que use tu app. Los dos gestores no pueden
-coexistir en un mismo proyecto iOS.
+The 3.x and 4.x lines support **both CocoaPods and Swift Package Manager**, with no
+extra steps on your side: the Capacitor CLI picks the `Package.swift` or the
+`CapacitorKhipu.podspec` depending on which manager your app uses. The two managers
+cannot coexist in the same iOS project.
 
 ## Install
 
