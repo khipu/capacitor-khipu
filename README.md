@@ -23,7 +23,28 @@ npx cap sync
 
 ## iOS setup
 
-No need for aditional steps
+The Khipu SDK opens the user's bank app to complete two-factor authorization. iOS
+only allows an app to check whether it can open another app's URL scheme
+(`canOpenURL`) if that scheme is declared in advance. Without this, `canOpenURL`
+returns `false`, the SDK silently skips opening the bank app **without raising any
+error**, and the two-factor authorization step simply never happens.
+
+Add `LSApplicationQueriesSchemes` to your app's `Info.plist`:
+
+```xml
+<key>LSApplicationQueriesSchemes</key>
+<array>
+  <string>bancochilemipass2</string>
+  <string>BciPassApp</string>
+  <string>BICEPassApp</string>
+  <string>scotiabankgo</string>
+  <string>SantanderPassApp</string>
+  <string>tupass</string>
+  <string>bancoestado</string>
+  <string>itau.cl</string>
+  <string>SecurityPass</string>
+</array>
+```
 
 ## Android setup
 
