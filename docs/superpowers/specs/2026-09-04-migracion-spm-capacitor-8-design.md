@@ -429,11 +429,22 @@ repositorio en un estado que no compile.
   que consume, y esa es la dirección incompatible. Hay que verificar el
   comportamiento real y subir la recomendación del README a al menos `2.0.21` en
   **las tres líneas**, no solo en la de Capacitor 8.
-- **Recursos de `KhipuClientIOS` bajo SPM.** Su `Package.swift` declara
-  `resources: [.process("Assets")]`, lo que genera un resource bundle. La carga
-  de esos recursos dentro de una app de Capacitor construida con SPM solo se
-  puede verificar corriendo la app de ejemplo en un dispositivo o simulador, no
-  con un build a secas.
+- **Recursos de `KhipuClientIOS` bajo SPM — resuelto, verificado en simulador.**
+  Su `Package.swift` declara `resources: [.process("Assets")]`, lo que genera un
+  resource bundle, y la duda era si esos recursos cargarían construidos por SPM
+  en vez de CocoaPods. **Cargan.** Verificado el 2026-09-04 corriendo la app de
+  ejemplo de Capacitor 8 en un simulador de iOS 26.5: la hoja de pago se presenta
+  y renderiza sus imágenes (el ícono del carro de compras, los de información y de
+  mostrar/ocultar contraseña, y el logotipo de «Operado por Khipu» del pie).
+
+  La misma corrida confirmó tres cosas más de punta a punta:
+  - `v2.16.5` impreso por el propio SDK al pie de la pantalla, o sea que el pin
+    `exact: "2.16.5"` es lo que corre en runtime, no solo lo que declara el manifest.
+  - El flag `title` llegó desde el harness hasta la barra superior, atravesando el
+    puente de Capacitor y el `KhipuOptionsMapper` reescrito.
+  - Los colores de marca se aplican en los dos temas: púrpura `#8347AD` en claro y
+    cian `#3CB4E5` en oscuro. Y `showFooter` mostró y ocultó el pie según se
+    incluyera la clave.
 - **Bug abierto de Capacitor 8 con SPM.** El issue
   `ionic-team/capacitor#8325` reporta que `CapApp-SPM` se genera pero los
   productos de los plugins no quedan expuestos en Xcode. Hay que revisar si nos
