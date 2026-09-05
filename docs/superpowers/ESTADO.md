@@ -15,7 +15,7 @@ pasó de Capacitor 5 a tres líneas: dos mantenidas y una congelada.
 | --- | --- | --- | --- | --- | --- |
 | 4.x | `main` | 8 | 15 | `latest` | `4.0.0` |
 | 3.x | `7.x` | 7 | 14 | `cap7` | `3.0.0` |
-| 2.x | `release/2.x` | 5 y 6 | 13 | `cap6` | `2.11.2` (ya fijada) |
+| 2.x | `release/2.x` | 5 y 6 | 13 | `cap6` | `2.11.2` ✅ publicada |
 
 **Las dos líneas mantenidas exponen `Package.swift` y `CapacitorKhipu.podspec`**, así
 que un comercio puede instalar por SPM o por CocoaPods en cualquiera de las dos. La
@@ -26,7 +26,9 @@ gestor demuestra la app de ejemplo de cada línea: `7.x` usa CocoaPods
 (el default de Capacitor 7) y `main` usa SPM (el de Capacitor 8), de modo que entre las
 dos quedan ambos caminos ejercitados con builds reales.
 
-Los tres branches están **empujados a `origin`**. Nada se ha publicado en npm.
+Los tres branches están **empujados a `origin`**. En npm está publicada solo la línea
+congelada: `capacitor-khipu@2.11.2` con dist-tag `cap6`, el 2026-09-05, tag `v2.11.2`.
+`latest` sigue en `2.11.1` hasta que salga `4.0.0`.
 
 ### Defectos corregidos que afectaban a comercios en producción
 
@@ -111,15 +113,22 @@ logotipo y las fuentes cargan. Detalle en el spec.
 ### 1. Publicar, en este orden
 
 ```
-release/2.x →  npx release-it 2.11.2      sale con --tag cap6
+release/2.x →  npm publish --tag cap6     ✅ hecho el 2026-09-05
 7.x         →  npx release-it 3.0.0       sale con --tag cap7
 main        →  npx release-it 4.0.0       toma latest
 ```
 
-Los tres dist-tags ya están anclados en el `release-it` de cada branch, junto con
+`2.11.2` salió con `npm publish --tag cap6` directo, no con release-it: su versión y su
+commit de release ya estaban fijados en el branch. Las dos líneas mantenidas sí usan
+release-it, que además arma el tag y el release de GitHub.
+
+Los tres dist-tags están anclados en el `release-it` de cada branch, junto con
 `requireBranch`, así que un release corrido desde el branch equivocado se rechaza. El
-orden importa igual: si `2.11.2` saliera sin su dist-tag sería la versión más alta del
-registro y `latest` retrocedería a la línea congelada.
+orden importa igual: si `2.11.2` hubiera salido sin su dist-tag sería la versión más
+alta del registro y `latest` habría retrocedido a la línea congelada.
+
+**El publish pide segundo factor por navegador** (`npm error code EOTP`), así que lo
+tiene que correr una persona; no se puede automatizar con el token de `~/.npmrc`.
 
 **Hasta que se publique, el README que los comercios leen en npm sigue siendo el
 equivocado**, incluida la instrucción de Kotlin que puede romperles el build. Si hay
