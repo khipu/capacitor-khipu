@@ -69,41 +69,20 @@ allprojects {
 
 Note that google() and mavenCentral() repos are usually already added.
 
-### Jetpack compose and Kotlin
+### Kotlin
 
-Khipu client for Android use Jetpack Compose technology, in order to do that the kotlin plugin must be enabled.
+**You do not need to add Kotlin to your app for Khipu.** The Android SDK ships its
+Jetpack Compose UI already compiled inside the AAR, and the Compose runtime arrives as
+a transitive dependency, so a plain Java Capacitor app consumes it without applying the
+Kotlin Gradle plugin.
 
-In the android/build.gradle file add the classpath for the `org.jetbrains.kotlin:kotlin-gradle-plugin:<version>` artifact
+Verified on the example app in this repo, which has no Kotlin plugin: it assembles and
+the payment screen renders on both Capacitor 7 and Capacitor 8.
 
-```
-buildscript {
-    
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.2.1'
-        classpath 'com.google.gms:google-services:4.4.0'
-        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.20'
-
-        // NOTE: Do not place your application dependencies here; they belong
-        // in the individual module build.gradle files
-    }
-}
-```
-
-Note that the classpath for `com.android.tools.build:gradle:<version>` and `com.google.gms:google-services:<version>` are usually already there.
-
-Then in the android/app/build.gradle file add the plugin at the top of the file
-
-```
-apply plugin: 'com.android.application'
-apply plugin: 'org.jetbrains.kotlin.android'
-```
-
-Note that the `com.android.application` plugin is usually already there.
-
+**If your app already uses Kotlin** for its own reasons, use **2.0.21 or newer**.
+`khipu-client-android` is compiled with Kotlin 2.0.21, and a Kotlin 1.9 compiler cannot
+read 2.0 metadata — your build will fail with a version error when your own Kotlin
+sources resolve against the SDK's classpath.
 
 ## API
 
