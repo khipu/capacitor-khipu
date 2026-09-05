@@ -434,8 +434,15 @@ repositorio en un estado que no compile.
   resource bundle, y la duda era si esos recursos cargarían construidos por SPM
   en vez de CocoaPods. **Cargan.** Verificado el 2026-09-04 corriendo la app de
   ejemplo de Capacitor 8 en un simulador de iOS 26.5: la hoja de pago se presenta
-  y renderiza sus imágenes (el ícono del carro de compras, los de información y de
-  mostrar/ocultar contraseña, y el logotipo de «Operado por Khipu» del pie).
+  y renderiza el logotipo de «Operado por Khipu» del pie, que es
+  `logo-khipu-color.png` del bundle.
+
+  El bundle contiene exactamente: `Images/` con `authorize.png` y
+  `logo-khipu-color.png`, `Fonts/` con las cuatro variantes de Public Sans, un
+  `HTML/khipuClient.html` y un `Colors.xcassets`. Solo esos elementos sirven como
+  evidencia: el ícono del comercio y los de información y contraseña **no** vienen
+  del bundle —son remotos o símbolos del sistema— así que su presencia no prueba
+  nada sobre la carga de recursos.
 
   La misma corrida confirmó tres cosas más de punta a punta:
   - `v2.16.5` impreso por el propio SDK al pie de la pantalla, o sea que el pin
