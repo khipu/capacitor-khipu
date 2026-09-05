@@ -1,6 +1,6 @@
 # Estado de la migración a SPM — dónde quedó y qué falta
 
-**Última actualización:** 2026-09-05
+**Última actualización:** 2026-09-05 — las tres líneas están publicadas
 
 Este documento es el punto de entrada para retomar el trabajo sin contexto previo.
 El diseño está en `specs/2026-09-04-migracion-spm-capacitor-8-design.md` y el plan
@@ -13,9 +13,9 @@ pasó de Capacitor 5 a tres líneas: dos mantenidas y una congelada.
 
 | Línea | Branch | Capacitor | iOS mín. | dist-tag | Versión a publicar |
 | --- | --- | --- | --- | --- | --- |
-| 4.x | `main` | 8 | 15 | `latest` | `4.0.0` |
-| 3.x | `7.x` | 7 | 14 | `cap7` | `3.0.0` |
-| 2.x | `release/2.x` | 5 y 6 | 13 | `cap6` | `2.11.2` ✅ publicada |
+| 4.x | `main` | 8 | 15 | `latest` | `4.0.0` ✅ publicada |
+| 3.x | `7.x` | 7 | 14 | `cap7` | `3.0.0` ✅ publicada |
+| 2.x | `release/2.x` | 5 y 6 | 13 | `cap6` | `2.11.3` ✅ publicada |
 
 **Las dos líneas mantenidas exponen `Package.swift` y `CapacitorKhipu.podspec`**, así
 que un comercio puede instalar por SPM o por CocoaPods en cualquiera de las dos. La
@@ -26,9 +26,15 @@ gestor demuestra la app de ejemplo de cada línea: `7.x` usa CocoaPods
 (el default de Capacitor 7) y `main` usa SPM (el de Capacitor 8), de modo que entre las
 dos quedan ambos caminos ejercitados con builds reales.
 
-Los tres branches están **empujados a `origin`**. En npm está publicada solo la línea
-congelada: `capacitor-khipu@2.11.2` con dist-tag `cap6`, el 2026-09-05, tag `v2.11.2`.
-`latest` sigue en `2.11.1` hasta que salga `4.0.0`.
+Las tres líneas están **publicadas en npm**, el 2026-09-05, con sus dist-tags:
+
+```
+{ latest: '4.0.0', cap6: '2.11.3', cap7: '3.0.0' }
+```
+
+Los tags `v2.11.2`, `v2.11.3`, `v3.0.0` y `v4.0.0` están en `origin`. `3.0.0` y `4.0.0`
+tienen release de GitHub porque salieron con release-it; las dos de la línea congelada
+no, porque salieron con `npm publish` directo.
 
 ### Defectos corregidos que afectaban a comercios en producción
 
@@ -108,33 +114,57 @@ gestor (`KhipuClientIOS.bundle` dentro del framework en CocoaPods,
 `KhipuClientIOS_KhipuClientIOS.bundle` en la raíz de la app en SPM), y aun así el
 logotipo y las fuentes cargan. Detalle en el spec.
 
+### Verificación con apps construidas desde cero
+
+Después de publicar se armaron tres apps vacías, una por major, se instaló el plugin
+con el comando que dice cada README y se siguió **solo** la documentación, sin usar
+nada sabido por el repo. Las seis combinaciones llegaron a la pantalla de pago con un
+`operationId` real.
+
+| | iOS | Android |
+| --- | --- | --- |
+| Cap 6 (`@cap6`) | `v2.16.5`, CocoaPods | `v2.27.0`, **requiere Kotlin** |
+| Cap 7 (`@cap7`) | `v2.16.5`, CocoaPods | `v2.27.0`, sin Kotlin |
+| Cap 8 (`latest`) | `v2.16.5`, **SPM** | `v2.27.0`, sin Kotlin |
+
+Las apps quedaron en `~/git/khipu-doctest/{cap6,cap7,cap8}`, fuera del repo. Se pueden
+borrar; sirven para repetir el ejercicio en el próximo release.
+
+Los tres comandos documentados resuelven a lo que deben, comprobado contra el registro:
+`@cap6`→`2.11.3`, `@cap7`→`3.0.0`, pelado→`4.0.0`. Y la advertencia del README de `7.x`
+es cierta: el comando pelado en una app Capacitor 7 falla con
+`ERESOLVE ... peer @capacitor/core@">=8.0.0" from capacitor-khipu@4.0.0`.
+
+**El hallazgo que esto destapó, y que ninguna prueba del repo podía destapar:** el
+plugin de Kotlin **sí hace falta en Capacitor 6**. El README decía que no, y esa
+afirmación se había escrito mirando las apps de ejemplo del repo, que son Capacitor 7 y
+8. Medido en la app Cap 6 desde cero:
+
+| AGP | Plugin de Kotlin | Resultado |
+| --- | --- | --- |
+| 8.2.1 (default de Cap 6) | ninguno | falla: cientos de `Duplicate class androidx.compose.ui.*` |
+| 8.2.1 | 1.9.0 (lo que decía docs.khipu.com) | falla: `Unknown Kotlin JVM target: 21` |
+| 8.2.1 | 2.0.21 | compila |
+| 8.7.2 | ninguno | compila |
+
+`androidx.compose.ui:ui` es multiplataforma: alguien tiene que pedir el atributo
+`org.jetbrains.kotlin.platform.type` o Gradle resuelve la variante `jvmstubs` y choca
+con `ui-android`. El plugin de Kotlin lo pide; AGP 8.7 en adelante también. **El eje es
+AGP, no el major de Capacitor**, y Capacitor 6 trae AGP 8.2.1 mientras 7 trae 8.7.2 y 8
+trae 8.13.0. Corregido en los README de las tres líneas, y `2.11.3` se publicó
+justamente para eso.
+
+También se reprodujo, ya fuera del harness, la divergencia de `locale`: la misma
+operación sin `locale` salió en español en iOS y en inglés en Android.
+
+Lo que **no** se pudo verificar: las nueve `LSApplicationQueriesSchemes` siguen
+comprobadas solo como declaración. Las seis corridas fueron en simulador y emulador,
+donde no hay apps de banco instaladas, así que `canOpenURL` nunca se ejerció de verdad.
+Hace falta un dispositivo físico con al menos una app bancaria.
+
 ## Qué falta
 
-### 1. Publicar, en este orden
-
-```
-release/2.x →  npm publish --tag cap6     ✅ hecho el 2026-09-05
-7.x         →  npx release-it 3.0.0       sale con --tag cap7
-main        →  npx release-it 4.0.0       toma latest
-```
-
-`2.11.2` salió con `npm publish --tag cap6` directo, no con release-it: su versión y su
-commit de release ya estaban fijados en el branch. Las dos líneas mantenidas sí usan
-release-it, que además arma el tag y el release de GitHub.
-
-Los tres dist-tags están anclados en el `release-it` de cada branch, junto con
-`requireBranch`, así que un release corrido desde el branch equivocado se rechaza. El
-orden importa igual: si `2.11.2` hubiera salido sin su dist-tag sería la versión más
-alta del registro y `latest` habría retrocedido a la línea congelada.
-
-**El publish pide segundo factor por navegador** (`npm error code EOTP`), así que lo
-tiene que correr una persona; no se puede automatizar con el token de `~/.npmrc`.
-
-**Hasta que se publique, el README que los comercios leen en npm sigue siendo el
-equivocado**, incluida la instrucción de Kotlin que puede romperles el build. Si hay
-comercios integrándose, vale avisarles por otro canal.
-
-### 2. Pendientes menores, ninguno bloqueante
+### Pendientes menores, ninguno bloqueante
 
 - **Verificar en Android que el modo oscuro mapea bien.** El camino de colores de
   Android es código Java distinto al de Swift, y solo se probó el claro.
@@ -149,6 +179,19 @@ comercios integrándose, vale avisarles por otro canal.
 - **`merge()` en `example/src/js/storage.js`**: la guarda de `colors` es a nivel del
   objeto completo, así que un `stored.colors = {}` pisaría `colors.include` con `false`.
   Latente, sin impacto bajo el uso real, y solo afecta al harness.
+- **Ejercitar `canOpenURL` en un dispositivo físico** con al menos una app de banco
+  instalada. Es lo único que las apps desde cero no pudieron cubrir, y hasta que se
+  haga, las nueve `LSApplicationQueriesSchemes` siguen verificadas solo como
+  declaración. Lo mismo vale para los otros tres plugins, según el equipo de docs.
+- **`exitUrl` salió mal tipado en `2.11.2`** (`string` en vez de `string | undefined`).
+  En `2.11.3` sigue igual porque corregirlo rompería la compilación de los comercios que
+  ya lo leen sin guarda, y la línea está congelada. Las dos líneas mantenidas lo tienen
+  correcto desde `48aabf7`.
+- **Los releases de GitHub de `2.11.2` y `2.11.3` no existen**, porque esa línea salió
+  con `npm publish` directo en vez de release-it. Se crean con `gh release create` si
+  alguien los echa de menos.
+- **30 alertas de Dependabot** en el branch por defecto (2 críticas, 17 altas). Son
+  dependencias de desarrollo, no llegan al comercio, y nadie las revisó todavía.
 
 ## Hallazgo pendiente de reportar a otros equipos
 
