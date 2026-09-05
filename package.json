@@ -1,6 +1,6 @@
 {
   "name": "capacitor-khipu",
-  "version": "2.11.1",
+  "version": "2.11.2",
   "description": "Capacitor plugin for Khipu",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -91,10 +91,12 @@
   "release-it": {
     "git": {
       "commitMessage": "chore: release ${version}",
-      "tagName": "v${version}"
+      "tagName": "v${version}",
+      "requireBranch": "release/2.x"
     },
     "npm": {
-      "publish": true
+      "publish": true,
+      "tag": "cap6"
     },
     "github": {
       "release": true
