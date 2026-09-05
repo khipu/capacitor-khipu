@@ -74,22 +74,39 @@ Note that google() and mavenCentral() repos are usually already added.
 **You do not need to add Kotlin to your app for Khipu.** The Android SDK ships its
 Jetpack Compose UI already compiled inside the AAR, and the Compose runtime arrives as
 a transitive dependency, so a plain Java Capacitor app consumes it without applying the
-Kotlin Gradle plugin.
+Kotlin Gradle plugin. Verified on a Capacitor 8 app built from scratch: AGP 8.13.0
+with no Kotlin plugin assembles, and the payment screen renders.
 
-What actually decides this is the Android Gradle Plugin, not Capacitor. `androidx.compose.ui:ui`
+What decides this is the Android Gradle Plugin, not Capacitor. `androidx.compose.ui:ui`
 is a multiplatform module, and something has to request the
 `org.jetbrains.kotlin.platform.type` attribute or Gradle resolves its `jvmstubs`
-variant and collides with the `ui-android` one that other paths pull, giving you
+variant and collides with the `ui-android` one that other paths pull, leaving you with
 hundreds of `Duplicate class androidx.compose.ui.*` errors. AGP 8.7 and newer request
-that attribute on their own; AGP 8.2 does not.
+that attribute on their own; AGP 8.2 does not. Capacitor 8 defaults to AGP 8.13.0.
 
-Capacitor 8 defaults to AGP 8.13.0, so a plain Java app is fine. **If you have pinned an
-older AGP, apply the Kotlin plugin** as described below.
+**If you have pinned an older AGP**, add the Kotlin Gradle plugin to
+`android/build.gradle`:
 
-**If your app already uses Kotlin** for its own reasons, use **2.0.21 or newer**.
-`khipu-client-android` is compiled with Kotlin 2.0.21, and a Kotlin 1.9 compiler cannot
-read 2.0 metadata — your build will fail with a version error when your own Kotlin
-sources resolve against the SDK's classpath.
+```gradle
+buildscript {
+    dependencies {
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21'
+    }
+}
+```
+
+and apply it in `android/app/build.gradle`:
+
+```gradle
+apply plugin: 'org.jetbrains.kotlin.android'
+```
+
+That is exactly what a Capacitor 6 app needs on AGP 8.2.1, and it is the same fix here.
+
+**Use Kotlin 2.0.21 or newer**, whether you are adding the plugin for the reason above
+or because your app already uses Kotlin. `khipu-client-android` is compiled with
+2.0.21: a 1.9 compiler cannot read 2.0 metadata, and under JDK 21 Kotlin 1.9.0 does not
+even configure, failing with `Unknown Kotlin JVM target: 21`.
 
 ## Usage
 
