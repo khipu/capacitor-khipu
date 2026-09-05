@@ -17,9 +17,12 @@ pasó de Capacitor 5 a tres líneas: dos mantenidas y una congelada.
 | 3.x | `7.x` | 7 | 14 | `cap7` | `3.0.0` |
 | 2.x | `release/2.x` | 5 y 6 | 13 | `cap6` | `2.11.2` (ya fijada) |
 
-**Las tres líneas exponen `Package.swift` y `CapacitorKhipu.podspec`**, así que un
-comercio puede instalar por SPM o por CocoaPods en cualquiera de las mantenidas. Lo que
-difiere es qué gestor demuestra la app de ejemplo de cada línea: `7.x` usa CocoaPods
+**Las dos líneas mantenidas exponen `Package.swift` y `CapacitorKhipu.podspec`**, así
+que un comercio puede instalar por SPM o por CocoaPods en cualquiera de las dos. La
+línea `2.x` no lleva `Package.swift`: se queda solo en CocoaPods, porque el soporte SPM
+de Capacitor 6 es experimental según su propia guía y el `capacitor-swift-pm` que haría
+falta entra en conflicto de resolución. Entre las mantenidas, lo que difiere es qué
+gestor demuestra la app de ejemplo de cada línea: `7.x` usa CocoaPods
 (el default de Capacitor 7) y `main` usa SPM (el de Capacitor 8), de modo que entre las
 dos quedan ambos caminos ejercitados con builds reales.
 
