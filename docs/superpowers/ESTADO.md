@@ -127,8 +127,28 @@ nada sabido por el repo. Las seis combinaciones llegaron a la pantalla de pago c
 | Cap 7 (`@cap7`) | `v2.16.5`, CocoaPods | `v2.27.0`, sin Kotlin |
 | Cap 8 (`latest`) | `v2.16.5`, **SPM** | `v2.27.0`, sin Kotlin |
 
-Las apps quedaron en `~/git/khipu-doctest/{cap6,cap7,cap8}`, fuera del repo. Se pueden
-borrar; sirven para repetir el ejercicio en el próximo release.
+Las apps se borraron una vez terminado el ejercicio. Para repetirlo en el próximo
+release, con `<N>` el major de Capacitor:
+
+```bash
+mkdir doctest-cap<N> && cd doctest-cap<N>
+npm init -y
+npm i @capacitor/core@^<N> && npm i -D @capacitor/cli@^<N> esbuild
+npx cap init "Doctest Cap<N>" com.khipu.doctest.cap<N> --web-dir=www
+npm i @capacitor/ios@^<N> @capacitor/android@^<N>
+npm install capacitor-khipu@<dist-tag>     # el comando que dice el README, tal cual
+npx cap add ios && npx cap add android
+```
+
+Después una página mínima que llame a `Khipu.startOperation({operationId, options})`,
+empaquetada con esbuild porque el import no funciona sin bundler, y **solo** los pasos
+de setup que el README indique: los `LSApplicationQueriesSchemes` en el `Info.plist` y
+el repo maven de khenshin en `allprojects`. Todo lo que haya que hacer y no esté
+escrito, es el hallazgo.
+
+Dos notas prácticas: usar Node 22, porque el 26 de Homebrew arma árboles distintos; y
+apuntar `xcodebuild` al simulador **por UDID**, no por nombre, que con varios runtimes
+instalados es ambiguo.
 
 Los tres comandos documentados resuelven a lo que deben, comprobado contra el registro:
 `@cap6`→`2.11.3`, `@cap7`→`3.0.0`, pelado→`4.0.0`. Y la advertencia del README de `7.x`
