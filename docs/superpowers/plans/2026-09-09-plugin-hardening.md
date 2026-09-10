@@ -1124,6 +1124,12 @@ In `android/build.gradle`, in `dependencies`:
 `2.28.0` is the current release in the khenshin repository and brings
 `com.khipu.khenshin:protocol` from `1.0.59` to `1.0.60`, the version iOS is already on.
 
+Expect no behaviour change from the client itself: its public API and its manifest are
+identical between the two versions, and the protocol change is purely additive — both
+jars hold 95 classes and the one addition is `FailureReasonType.USER_DISCONNECTED`,
+which `forValue(String)` recognises. If this build turns up anything more than a
+version string moving, stop and find out why before continuing.
+
 - [ ] **Step 2: Build against it**
 
 Run: `cd android && ./gradlew clean build test && cd ..`

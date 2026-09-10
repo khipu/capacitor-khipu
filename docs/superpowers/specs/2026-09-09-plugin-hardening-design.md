@@ -192,6 +192,12 @@ the bridge still holds the first**; a stale pending call is detected and cleared
 the new call proceeds. The lock cannot become permanent because it is never the sole
 source of truth.
 
+That last property is worth more than it looks. The React Native bridge, which has no
+equivalent registry — `Promise` exposes only `resolve` and `reject`, with nothing to
+query — found it has to close the host-Activity-recreation case by hand, through a
+lifecycle listener, because there a surviving module field is the only bookkeeping.
+Asking the bridge instead of trusting our own field covers that case for free.
+
 **Ordering rule, adopted from the peer reports:** store the call as late as possible,
 and put everything that can throw either before the point of no return or inside a
 `try` that answers.
@@ -325,9 +331,17 @@ repository: `2.28.0` is the current release and it brings
 `com.khipu.khenshin:protocol` from `1.0.59` to `1.0.60`, which is the version iOS is
 already on.
 
-This may also be where the crash in **Known limitations** is fixed, since that crash
-lives in `com.khipu.khenshin.protocol.Converter` — but that is a hypothesis, not a
-verified fix, and nothing in this plan depends on it.
+The bump is as low-risk as a dependency bump gets, and it was measured rather than
+assumed. The client's public API is unchanged between the two versions and so is its
+manifest; the only real change is the protocol pin. The protocol change is purely
+additive: both jars carry 95 classes, and the single addition is
+`FailureReasonType.USER_DISCONNECTED`, which `forValue(String)` recognises rather than
+declaring and ignoring.
+
+That addition is what the crash in **Known limitations** was hitting. Nothing in this
+plan depends on it: the plugin passes `failureReason` through as a string and has no
+enum of its own, so a new value needs no code change on our side — which is also why
+the `failureReason` JSDoc must not enumerate the possible values.
 
 ## Testing
 
@@ -426,9 +440,15 @@ reproduced since. On a failure event the SDK throws
 `com.khipu.khenshin.protocol.Converter`, on socket.io's `EventThread`. It is
 uncaught on a thread no bridge controls, so the process dies — and a dead process
 cannot resolve or reject anything. **No callback-lifecycle work in this plan covers
-it**, including C4. It smells like forward incompatibility: a value the server knows
-and the client's enum does not. We did not reproduce it and do not claim it is fixed
-by the `2.28.0` bump.
+it**, including C4.
+
+It was forward incompatibility, and the `2.28.0` bump closes the case that was hit:
+`USER_DISCONNECTED` is the one value protocol `1.0.60` adds, and `forValue` recognises
+it. **The mechanism is untouched.** The socket listener still calls the converter with
+no `try`/`catch`, and the enums still have no `@JsonEnumDefaultValue`, so the next
+value a client does not know kills the process again. Measured by the React Native
+bridge session and re-verified here against both jars. The fix belongs in the SDK, and
+they have taken it there.
 
 **The AAR injects location permissions.** Its manifest declares `INTERNET`,
 `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION`, and the manifest merger puts all
