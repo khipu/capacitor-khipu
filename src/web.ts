@@ -207,6 +207,12 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
 
+  /**
+   * We create our own mount element rather than letting kws create it. kws creates a
+   * div with this identical id (`khipu-web-root`) and forces `modal = true` when
+   * `mountElement` is absent, so relying on that would work too — but it is an
+   * internal detail of a script we do not version, and depending on it buys nothing.
+   */
   private mountElement(): HTMLElement {
     const existing = document.getElementById(KhipuWeb.ROOT_ID);
     if (existing) {
