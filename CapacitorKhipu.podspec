@@ -14,5 +14,5 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = '15.0'
   s.dependency 'Capacitor'
   s.dependency 'KhipuClientIOS', '2.16.5'
-  s.swift_version = '5.1'
+  s.swift_version = '5.9'
 end
