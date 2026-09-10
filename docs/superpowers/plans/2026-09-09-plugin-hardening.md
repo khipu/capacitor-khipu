@@ -2232,13 +2232,17 @@ Expected: PASS through test, versions, keys, readme, ios, android, web.
 Run: `npm run lint`
 Expected: PASS, including SwiftLint.
 
-- [ ] **Step 3: Push and watch CI**
+- [ ] **Step 3: Stop here and hand the push back**
 
-```bash
-git push origin main
-gh run watch
-```
-Expected: the four jobs green.
+**Do not push.** The work is on the `plugin-hardening` branch, and pushing a branch or
+merging to `main` is an outward-facing action on a shared repository — it belongs to the
+user, not to this plan. Report that local verification is complete and what it showed.
+
+When the user does want it pushed, the options are theirs to pick: push the branch and
+open a pull request, or merge to `main` first. Either way CI runs the four jobs, and the
+`example` job only runs on push, so the Android build step added in Task 12 gets its
+first real exercise there — it is the one change in this plan that could not be verified
+locally.
 
 - [ ] **Step 4: Record the outcome**
 
