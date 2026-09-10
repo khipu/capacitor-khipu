@@ -156,7 +156,7 @@ outcome — the user abandoned the payment — arrive in two different shapes de
 an invisible timing detail. The current code already does not branch on it; this
 change makes that property structural instead of incidental. See **Evidence**.
 
-### C4. Call lifecycle: supersede, never lock
+### C4. Call lifecycle: one operation at a time, with a liveness check
 
 Capacitor keys the activity callback off a single field: `startActivityForResult`
 stores `lastPluginCallId = call.getCallbackId()` (`Plugin.java:180`) and
@@ -164,21 +164,33 @@ stores `lastPluginCallId = call.getCallbackId()` (`Plugin.java:180`) and
 overlapping `startOperation` calls mean the second overwrites the first, both results
 are delivered to the second, and the first promise hangs.
 
-The obvious fix — reject a second call while one is in flight — is the wrong one. A
-peer session shipped exactly that guard and turned a recoverable hang into a permanent
-one: any hung call left the plugin refusing every subsequent operation.
+Two fixes were considered and one was reversed during design, so both are recorded.
 
-**Change: supersede instead of locking.** A new `startOperation` settles the pending
-call by rejecting it with an explicit reason and takes over.
+**Rejected: supersede.** Settle the pending call and let the new one take over. It
+cannot strand the plugin, but a peer session pointed out the physical problem: while
+the first operation is in flight the SDK activity is *on screen* and will deliver its
+result. Superseding throws that result away — and it may be a payment that actually
+went through.
 
-- The superseded promise always settles; it never hangs.
-- No state outlives a call, so no state can strand the plugin. A stuck pending call
-  self-heals on the next call.
-- It makes explicit what the framework already does — the newest call wins — instead
-  of fighting it.
-- Corner case covered: if `getActivityLauncherOrReject` already rejected the stored
-  call, superseding rejects an already-rejected call. Verified harmless — a second
-  response message on a settled promise is ignored.
+**Chosen: reject the second call while a first is genuinely in flight.** The in-flight
+operation keeps the slot and its result is delivered correctly. No real outcome is
+discarded.
+
+The usual objection to a lock is that one hung call leaves the plugin refusing every
+operation forever — a peer shipped exactly that and paid for it. Capacitor gives us a
+way out that does not depend on our own bookkeeping being perfect: when a call is
+resolved or rejected, `MessageHandler.sendResponseMessage` calls `call.release(bridge)`
+(`MessageHandler.java:135-137`), and `PluginCall.release` removes it from the bridge's
+saved calls (`PluginCall.java:360-364`). So
+
+```
+bridge.getSavedCall(pendingId) != null
+```
+
+is an authoritative "still in flight" test. The guard rejects a second call **only when
+the bridge still holds the first**; a stale pending call is detected and cleared, and
+the new call proceeds. The lock cannot become permanent because it is never the sole
+source of truth.
 
 **Ordering rule, adopted from the peer reports:** store the call as late as possible,
 and put everything that can throw either before the point of no return or inside a
@@ -186,7 +198,8 @@ and put everything that can throw either before the point of no return or inside
 
 1. Validate `operationId` → reject.
 2. Map options inside a `try` → reject with `INVALID_OPTIONS`.
-3. Supersede any pending call.
+3. If a pending call is still live in the bridge → reject the new call with
+   `OPERATION_IN_PROGRESS`. Otherwise clear the stale pending.
 4. Record the pending call and launch inside a `try` that clears state and rejects
    with `LAUNCH_FAILED`.
 
@@ -195,9 +208,30 @@ and launches at `:182`. If `launch()` throws, the call is already saved and woul
 otherwise never be answered — and the reason to guard it is not any particular
 exception but the shape of the failure: **if the activity does not start, no result
 will ever arrive, which is exactly the condition that strands the call.** The cost of
-the `try` is nothing and the class of failure it covers is the worst one. The stale
-entry left in the bridge's saved-call map is harmless, since the next call overwrites
-`lastPluginCallId`.
+the `try` is nothing and the class of failure it covers is the worst one.
+
+### C5. Build the result explicitly, and let the guard see it
+
+`operationResult` hands the SDK's own serialisation straight to JS:
+`new JSObject(khipuResult.asJson())`. `KhipuResult.asJson()` is `Gson().toJson(this)`
+(`KhipuResult.kt:30-32`), and Gson omits nulls by default. `exitUrl`, `continueUrl`
+and `failureReason` are all `String?`, so on a cancelled operation **those keys are not
+empty — they are absent**, while iOS sends them through `call.resolve` as `nil as Any`.
+
+This is precisely the half of the contract `check-option-keys.mjs` documents that it
+cannot check, because Android's result keys are not in our source to extract.
+
+**Change:** Android builds the result object key by key, the way iOS already does. Two
+things follow. The platforms stop diverging, and the keys become extractable — so the
+vocabulary guard can finally cover the return path on **both** platforms instead of one.
+
+**Left open on purpose:** which shape is canonical. The declared type is
+`exitUrl: string | undefined`; an absent key reads as `undefined` and satisfies it,
+while `null` does not. That points at "omit" as the canon, which would mean changing
+iOS — but what Capacitor's iOS bridge actually does with `nil as Any` has not been
+measured, and it may already omit the key. Until someone measures it on a device,
+Android keeps the shape it has today (absent), which is the one the published type
+promises. The measurement is recorded as a pending item in `docs/STATUS.md`.
 
 ## D. Web layer
 
@@ -284,6 +318,17 @@ outcome recorded in `docs/STATUS.md`.
 - Podspec `s.swift_version` `5.1` → `5.9`, matching `swift-tools-version: 5.9`.
 - CI `example` job builds Android as well as iOS.
 
+## I. Android SDK bump
+
+`com.khipu:khipu-client-android` `2.27.0` → `2.28.0`. Verified against the khenshin
+repository: `2.28.0` is the current release and it brings
+`com.khipu.khenshin:protocol` from `1.0.59` to `1.0.60`, which is the version iOS is
+already on.
+
+This may also be where the crash in **Known limitations** is fixed, since that crash
+lives in `com.khipu.khenshin.protocol.Converter` — but that is a hypothesis, not a
+verified fix, and nothing in this plan depends on it.
+
 ## Testing
 
 Test-driven for everything with behaviour — the README guard, the Android mapper and
@@ -350,8 +395,46 @@ payment screen renders — the merger injects it. Merchants do not need to decla
 - `capacitor/build.gradle:91-92` — `org.json:json:20250517` and
   `mockito-core:5.20.0` for JVM unit tests.
 
+- `MessageHandler.java:135-137` — a call that is not kept alive is released as soon as
+  it is answered; `PluginCall.java:360-364` — `release` removes it from the bridge's
+  saved calls. Together these make `bridge.getSavedCall(id) != null` an authoritative
+  liveness test.
+
+**`KhipuResult.kt:30-32`** — `asJson()` is `Gson().toJson(this)`, and Gson omits nulls
+by default; `exitUrl`, `continueUrl` and `failureReason` are declared `String?`.
+
+**khenshin repository:** `khipu-client-android` `2.28.0` is the current release;
+its POM depends on `com.khipu.khenshin:protocol:1.0.60`, where `2.27.0` depends on
+`1.0.59`.
+
+**The AAR's manifest** (read from the Gradle cache with `unzip -p` + `grep -a` and a
+control pattern) declares `INTERNET`, `ACCESS_FINE_LOCATION` and
+`ACCESS_COARSE_LOCATION`.
+
 **TypeScript:** the README example fails with `TS2740` under both `--strict` and
 default settings.
+
+## Known limitations
+
+Neither is fixable in this plugin. Both are recorded in `docs/STATUS.md` so they are
+not rediscovered from scratch, and both want a channel to the Android SDK team.
+
+**An unknown `FailureReasonType` crashes the whole process.** Reported by the React
+Native bridge session, reproduced once by them while measuring something else and not
+reproduced since. On a failure event the SDK throws
+`JsonMappingException: Cannot deserialize FailureReasonType` inside
+`com.khipu.khenshin.protocol.Converter`, on socket.io's `EventThread`. It is
+uncaught on a thread no bridge controls, so the process dies — and a dead process
+cannot resolve or reject anything. **No callback-lifecycle work in this plan covers
+it**, including C4. It smells like forward incompatibility: a value the server knows
+and the client's enum does not. We did not reproduce it and do not claim it is fixed
+by the `2.28.0` bump.
+
+**The AAR injects location permissions.** Its manifest declares `INTERNET`,
+`ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION`, and the manifest merger puts all
+three into every merchant app. Merchants publishing to Play have to declare location
+use in their data safety form. Documenting it in the README was considered for this
+pass and deliberately left out; it is recorded as pending instead.
 
 ## Risks
 
