@@ -1104,50 +1104,101 @@ git commit -m "test: hold src/web.ts to the option contract too"
 
 ---
 
-### Task 7: Bump the Android SDK to 2.28.0
+### Task 7: Bump the Android SDK to the current release
 
 **Files:**
 - Modify: `android/build.gradle`
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `com.khipu:khipu-client-android:2.28.0` on the classpath for Tasks 8-11.
+- Produces: the bumped `com.khipu:khipu-client-android` coordinate for Tasks 8-11, and
+  a ledger note saying which version landed and whether it carries the socket guard.
 
-- [ ] **Step 1: Change the dependency**
+**Do not hardcode a version from this plan.** At the time of writing, `2.28.0` was the
+current release and `2.28.1` — carrying the `IKW-1232` socket guard — was being merged
+with no publication date. Resolve what is actually published when you run this, and
+verify what it contains. The number is decided by what enters the merge; go by the
+markers, not by the number.
+
+- [ ] **Step 1: Find the current release**
+
+Run:
+```bash
+curl -sS "https://dev.khipu.com/nexus/content/repositories/khenshin/com/khipu/khipu-client-android/maven-metadata.xml" | grep -E '<release>|<latest>'
+```
+Take the `<release>` value. Call it `V`. If `V` is `2.28.0`, that is fine — use it and
+say so in your report; nothing in this plan depends on the newer one.
+
+- [ ] **Step 2: Confirm the protocol pin**
+
+Run:
+```bash
+curl -sS "https://dev.khipu.com/nexus/content/repositories/khenshin/com/khipu/khipu-client-android/$V/khipu-client-android-$V.pom" | grep -A2 '<artifactId>protocol</artifactId>'
+```
+Expected: `1.0.60` or newer. `1.0.60` is the version iOS is already on and the one that
+adds `FailureReasonType.USER_DISCONNECTED`. If it reads `1.0.59`, stop and report — that
+would mean the release went backwards.
+
+- [ ] **Step 3: Change the dependency**
 
 In `android/build.gradle`, in `dependencies`:
 
 ```gradle
-    implementation 'com.khipu:khipu-client-android:2.28.0'
+    implementation 'com.khipu:khipu-client-android:V'
 ```
 
-`2.28.0` is the current release in the khenshin repository and brings
-`com.khipu.khenshin:protocol` from `1.0.59` to `1.0.60`, the version iOS is already on.
+with `V` substituted.
 
-Expect no behaviour change from the client itself: its public API and its manifest are
-identical between the two versions, and the protocol change is purely additive — both
-jars hold 95 classes and the one addition is `FailureReasonType.USER_DISCONNECTED`,
-which `forValue(String)` recognises. If this build turns up anything more than a
-version string moving, stop and find out why before continuing.
-
-- [ ] **Step 2: Build against it**
+- [ ] **Step 4: Build against it**
 
 Run: `cd android && ./gradlew clean build test && cd ..`
-Expected: PASS. The build resolves the new artifact from
-`https://dev.khipu.com/nexus/content/repositories/khenshin`, which is already declared
-in `repositories`.
+Expected: PASS. The artifact resolves from the khenshin repository already declared in
+`repositories`.
 
-- [ ] **Step 3: Confirm the resolved version**
+Expect no behaviour change from the client between `2.27.0` and `2.28.0`: their public
+API and manifests are identical, and the protocol change is purely additive — both jars
+hold 95 classes and the one addition is `FailureReasonType.USER_DISCONNECTED`, which
+`forValue(String)` recognises. If the build turns up more than a version string moving,
+stop and find out why before continuing.
+
+- [ ] **Step 5: Record whether the socket guard is in the artifact**
+
+Only meaningful if `V` is past `2.28.0`. **Do not check this by counting exception
+tables in `KhipuSocketIOClient`** — that count stays at 1 with the fix in place, because
+the new `try`/`catch` lives in a different class. The two real markers, per the SDK
+team who wrote it:
+
+```bash
+aar=$(find ~/.gradle/caches -name "khipu-client-android-$V.aar" | head -1)
+mkdir -p /tmp/khipu-aar && unzip -p "$aar" classes.jar > /tmp/khipu-aar/classes.jar
+unzip -o -q /tmp/khipu-aar/classes.jar -d /tmp/khipu-aar/classes
+javap -p /tmp/khipu-aar/classes/com/khipu/client/socket/SocketMessageGuardKt.class
+javap -p /tmp/khipu-aar/classes/com/khipu/client/socket/KhipuSocketIOClient.class | grep onMessage
+```
+
+Expected when the guard is present: `SocketMessageGuardKt` exists at all — it does not
+in `2.28.0` — and declares
+`public static final void runGuarded(String, KhipuViewModel, Function0<Unit>)`; and
+`KhipuSocketIOClient` declares
+`private final void onMessage(String, Function1<? super Object[], Unit>)`.
+
+Report which markers you found. This does not gate the task: the bump is worth doing
+either way, and no code in this plan calls either symbol.
+
+- [ ] **Step 6: Confirm the resolved version**
 
 Run: `cd android && ./gradlew dependencies --configuration releaseRuntimeClasspath | grep -E 'khipu-client-android|protocol' && cd ..`
-Expected: `com.khipu:khipu-client-android:2.28.0` and `com.khipu.khenshin:protocol:1.0.60`.
+Expected: `com.khipu:khipu-client-android:V` and `com.khipu.khenshin:protocol:1.0.60`
+or newer.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add android/build.gradle
-git commit -m "feat: update khipu-client-android to 2.28.0"
+git commit -m "feat: update khipu-client-android to V"
 ```
+
+with `V` substituted in the message.
 
 ---
 
