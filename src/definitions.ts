@@ -198,11 +198,16 @@ export interface KhipuResult {
    */
   operationId: string;
   /**
-   * Title suggested for the screen you show once the flow ends.
+   * Title of the closing screen the SDK already showed the payer (success, failure,
+   * warning, or continue). Confirmed on iOS, Android and web: all three set it from
+   * the same title the SDK's own screen displayed. Reuse it if you render your own
+   * screen instead of the SDK's.
    */
   exitTitle: string;
   /**
-   * Message suggested for the screen you show once the flow ends.
+   * Body text of the closing screen the SDK already showed the payer, paired with
+   * `exitTitle`. Confirmed on iOS, Android and web. Reuse it if you render your own
+   * screen instead of the SDK's.
    */
   exitMessage: string;
   /**
@@ -223,8 +228,10 @@ export interface KhipuResult {
    */
   failureReason: string | undefined;
   /**
-   * URL the native SDK provides to continue the operation in a further step, when
-   * there is one.
+   * URL to send the payer to so they can finish the operation. Present when, and
+   * only when, `result` is `'CONTINUE'` — confirmed on iOS, Android and web, where
+   * every other outcome branch leaves it `undefined`/`nil`. Undefined for every
+   * other `result` value.
    */
   continueUrl: string | undefined;
   /**
