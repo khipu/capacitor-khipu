@@ -1,9 +1,48 @@
 # Status
 
-**Last updated:** 2026-09-05 — all three lines are published to npm.
+**Last updated:** 2026-09-10 — `plugin-hardening` branch, local verification complete,
+CI pending a push.
 
 This is the entry point for picking up plugin work without prior context. The design
 and plan for work currently in progress live under `docs/superpowers/`.
+
+## Plugin hardening pass (`plugin-hardening` branch, not yet pushed)
+
+Twelve tasks changed TypeScript, Swift, Java, the two guard scripts, the podspec and CI.
+What landed:
+
+- **The contract is now optional and documented**: `KhipuOptions` fields that a merchant
+  omits are treated deliberately rather than by accident, and the behaviour is written
+  down rather than left to be discovered.
+- **The README is held to the compiler**: `verify:readme` extracts every TypeScript
+  block from `README.md` and compiles it against `src/index.ts` with
+  `exactOptionalPropertyTypes`, so a README example that would not actually compile for
+  a merchant fails the build instead of shipping.
+- **The web layer loads on demand and always settles**: the Khipu web SDK script is
+  fetched lazily rather than bundled, and the promise it returns resolves or rejects in
+  every path, including the ones that previously left a caller hanging.
+- **Android has a tested mapper and result reader**, and **refuses a concurrent
+  operation** instead of leaving a second call to interfere with one already in flight.
+- **The Android SDK moved to `2.28.1`** (`com.khipu:khipu-client-android`). The iOS SDK
+  stays on `KhipuClientIOS 2.16.5`, in sync across `Package.swift` and the podspec.
+- **The vocabulary guard (`verify:keys`) now covers the web surface and both platforms'
+  return path**, not just the options each platform reads: it checks `src/web.ts`
+  against `src/definitions.ts`, and checks the result fields both the iOS and Android
+  plugins emit against the same contract.
+
+**Local verification for this branch is complete; CI has not run on it.** `npm run
+verify` passes end to end: 55 Vitest tests, the versions guard, the keys guard, the
+readme guard, `xcodebuild build`, `./gradlew clean build test` (24 JUnit tests, all
+passing), and `npm run build`. `npm run lint` currently **fails** at the `prettier
+--check` stage on `android/src/test/java/com/khipu/capacitor/KhipuOptionsMapperTest.java`
+(introduced in `d1c8c5d`), which also means SwiftLint was never reached in that run; run
+standalone, `node-swiftlint` confirms the known failure mode documented in
+`.github/workflows/ci.yml` — it warns the binary is absent and exits 0 without linting a
+single line of Swift. Swift lint coverage for this branch currently comes from CI only.
+
+**The version to publish is `4.1.0`.** Publishing is not done here: `npm publish` needs
+a human with 2FA, and pushing the branch (or opening the PR, or merging) is the user's
+call, not something run as part of this pass.
 
 ## Published lines
 
