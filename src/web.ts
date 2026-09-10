@@ -66,7 +66,11 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
       // @ts-ignore
       this.khipu = new Khipu();
 
-      let theme = options.options.theme ?? 'light';
+      // `options.options` is optional: an absent presentation options object is
+      // equivalent to an empty one, matching how Android and iOS default it.
+      const presentation = options.options ?? {};
+
+      let theme = presentation.theme ?? 'light';
       if (theme === 'system') {
         if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
           theme = 'dark';
@@ -75,10 +79,10 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
         }
       }
       let primaryColor = undefined;
-      if (theme === 'light' && options.options.colors?.lightPrimary !== undefined) {
-        primaryColor = options.options.colors?.lightPrimary;
-      } else if (theme === 'dark' && options.options.colors?.darkPrimary !== undefined) {
-        primaryColor = options.options.colors?.darkPrimary;
+      if (theme === 'light' && presentation.colors?.lightPrimary !== undefined) {
+        primaryColor = presentation.colors?.lightPrimary;
+      } else if (theme === 'dark' && presentation.colors?.darkPrimary !== undefined) {
+        primaryColor = presentation.colors?.darkPrimary;
       }
 
       const khipuOptions = {
@@ -89,9 +93,9 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
             ...(primaryColor !== undefined ? { primaryColor: primaryColor } : {}),
             theme: theme,
           },
-          skipExitPage: options.options?.skipExitPage !== undefined ? options.options.skipExitPage : false,
+          skipExitPage: presentation.skipExitPage !== undefined ? presentation.skipExitPage : false,
           skipExitSuccessPage:
-            options.options?.skipExitSuccessPage !== undefined ? options.options.skipExitSuccessPage : false,
+            presentation.skipExitSuccessPage !== undefined ? presentation.skipExitSuccessPage : false,
         },
       };
       this.khipu.startOperation(

@@ -110,7 +110,16 @@ even configure, failing with `Unknown Kotlin JVM target: 21`.
 
 ## Usage
 
-The plugin exports a single object, `Khipu`:
+The plugin exports a single object, `Khipu`. The only thing you have to pass is the
+operation id:
+
+```typescript
+import { Khipu } from 'capacitor-khipu';
+
+const result = await Khipu.startOperation({ operationId: '<the operation id>' });
+```
+
+To customize the presentation, pass `options`:
 
 ```typescript
 import { Khipu } from 'capacitor-khipu';

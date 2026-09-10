@@ -4,7 +4,7 @@ export interface KhipuPlugin {
 
 export interface StartOperationOptions {
   operationId: string;
-  options: KhipuOptions;
+  options?: KhipuOptions | undefined;
 }
 
 export interface KhipuOptions {
