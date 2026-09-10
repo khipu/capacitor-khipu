@@ -444,11 +444,34 @@ it**, including C4.
 
 It was forward incompatibility, and the `2.28.0` bump closes the case that was hit:
 `USER_DISCONNECTED` is the one value protocol `1.0.60` adds, and `forValue` recognises
-it. **The mechanism is untouched.** The socket listener still calls the converter with
-no `try`/`catch`, and the enums still have no `@JsonEnumDefaultValue`, so the next
-value a client does not know kills the process again. Measured by the React Native
-bridge session and re-verified here against both jars. The fix belongs in the SDK, and
-they have taken it there.
+it. Measured by the React Native bridge session and re-verified here against both jars.
+
+**The mechanism is being fixed in the SDK, under `IKW-1232`** — the single ticket all
+four bridge repositories reference. Its 23 socket listeners are wrapped so a handler
+throwing no longer reaches socket.io's `EventThread`. As of this writing the fix is on
+a branch and neither merged nor released; it is expected as a patch bump, `2.28.1`, with
+no date. Nothing in this plan waits for it.
+
+Two consequences of that fix reach this plugin, and both are behaviour we must already
+be correct about:
+
+- **A terminal message that fails to deserialise now ends the operation**, so the
+  launcher callback fires and the promise settles — but the `KhipuResult` may arrive
+  with no `failureReason`, precisely because the detail is what failed to parse. Section
+  C5's reader already handles this: it skips null values, so the key is simply absent
+  and reads as `undefined`, which is what `failureReason: string | undefined` promises.
+  A test asserts it rather than leaving it to inference.
+- **A non-terminal message that fails is logged and ignored**, and the operation
+  continues. If the message was a `FORM_REQUEST`, the payer waits for a form that will
+  never render: no crash, no exit. For us that means the activity stays up and the
+  `PluginCall` stays genuinely in flight, so C4's liveness check reports it live and a
+  second `startOperation` is refused — which is correct, because the first really is
+  still running. The escape is the payer cancelling, which the SDK routes through its
+  back dialog to a normal `RESULT_OK`. Worth knowing when a merchant reports a payment
+  that "hangs" with no error.
+
+The protocol generator itself is untouched, so hardening the deserialisation remains
+open on the SDK side.
 
 **The AAR injects location permissions.** Its manifest declares `INTERNET`,
 `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION`, and the manifest merger puts all

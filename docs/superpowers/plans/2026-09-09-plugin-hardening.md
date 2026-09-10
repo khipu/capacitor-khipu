@@ -1490,6 +1490,19 @@ public class KhipuResultReaderTest {
     }
 
     @Test
+    public void omitsFailureReasonWhenTheSdkCouldNotDetermineOne() {
+        // Not hypothetical. Under IKW-1232 the SDK ends the operation when a terminal
+        // message fails to deserialise, and the reason is exactly the part that failed
+        // to parse, so it arrives null.
+        KhipuResult withoutReason = new KhipuResult("op-1", "", "", null, null, "ERROR", new KhipuEvent[0], null);
+
+        JSObject result = KhipuResultReader.read(withoutReason);
+
+        assertEquals("ERROR", result.getString("result"));
+        assertFalse(result.has("failureReason"));
+    }
+
+    @Test
     public void alwaysCarriesTheEventsArray() {
         assertTrue(KhipuResultReader.read(canceled()).has("events"));
     }
@@ -1614,7 +1627,7 @@ Read `KhipuEvent.kt` for its accessor names before writing this; adjust if they 
 - [ ] **Step 4: Run the test**
 
 Run: `cd android && ./gradlew test && cd ..`
-Expected: PASS, 6 new tests.
+Expected: PASS, 7 new tests.
 
 - [ ] **Step 5: Use it from `operationResult`**
 
