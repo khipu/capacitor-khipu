@@ -6,12 +6,12 @@ import XCTest
 
 final class KhipuOptionsMapperTests: XCTestCase {
 
-    func testSinOpcionesElDraftQuedaVacio() {
+    func testDraftIsEmptyWithoutOptions() {
         XCTAssertEqual(KhipuOptionsMapper.draft(from: nil), KhipuOptionsDraft())
         XCTAssertEqual(KhipuOptionsMapper.draft(from: JSObject()), KhipuOptionsDraft())
     }
 
-    func testMapeaLosCamposDeTexto() {
+    func testMapsTheTextFields() {
         let draft = KhipuOptionsMapper.draft(from: [
             "title": "Demo Capacitor",
             "titleImageUrl": "https://khipu.com/logo.png",
@@ -23,7 +23,7 @@ final class KhipuOptionsMapperTests: XCTestCase {
         XCTAssertEqual(draft.locale, "es_CL")
     }
 
-    func testMapeaLosCincoBooleanos() {
+    func testMapsTheFiveBooleans() {
         let draft = KhipuOptionsMapper.draft(from: [
             "skipExitPage": true,
             "skipExitSuccessPage": true,
@@ -39,31 +39,31 @@ final class KhipuOptionsMapperTests: XCTestCase {
         XCTAssertEqual(draft.showPaymentDetails, true)
     }
 
-    func testUnBooleanoEnFalseSeDistingueDeUnBooleanoAusente() {
-        let presente = KhipuOptionsMapper.draft(from: ["showFooter": false])
-        let ausente = KhipuOptionsMapper.draft(from: JSObject())
+    func testFalseBooleanDiffersFromAbsentBoolean() {
+        let present = KhipuOptionsMapper.draft(from: ["showFooter": false])
+        let absent = KhipuOptionsMapper.draft(from: JSObject())
 
-        XCTAssertEqual(presente.showFooter, false)
-        XCTAssertNil(ausente.showFooter)
+        XCTAssertEqual(present.showFooter, false)
+        XCTAssertNil(absent.showFooter)
     }
 
-    func testAceptaBooleanosEnvueltosEnNSNumber() {
+    func testAcceptsBooleansWrappedInNSNumber() {
         let draft = KhipuOptionsMapper.draft(from: ["showFooter": NSNumber(value: true)])
 
         XCTAssertEqual(draft.showFooter, true)
     }
 
-    func testMapeaLosTresTemas() {
+    func testMapsTheThreeThemes() {
         XCTAssertEqual(KhipuOptionsMapper.draft(from: ["theme": "light"]).theme, .light)
         XCTAssertEqual(KhipuOptionsMapper.draft(from: ["theme": "dark"]).theme, .dark)
         XCTAssertEqual(KhipuOptionsMapper.draft(from: ["theme": "system"]).theme, .system)
     }
 
-    func testIgnoraUnTemaDesconocido() {
+    func testIgnoresAnUnknownTheme() {
         XCTAssertNil(KhipuOptionsMapper.draft(from: ["theme": "neon"]).theme)
     }
 
-    func testMapeaLosDoceColores() {
+    func testMapsTheTwelveColors() {
         let colors: JSObject = [
             "lightBackground": "#FFFFFF",
             "lightOnBackground": "#1A1A1A",
@@ -100,29 +100,29 @@ final class KhipuOptionsMapperTests: XCTestCase {
         )
     }
 
-    func testColorsAusenteDejaElDraftSinColores() {
+    func testAbsentColorsLeavesTheDraftWithoutColors() {
         XCTAssertNil(KhipuOptionsMapper.draft(from: JSObject()).colors)
     }
 
-    func testColorsVacioProduceUnDraftDeColoresVacio() {
+    func testEmptyColorsProducesAnEmptyColorsDraft() {
         let draft = KhipuOptionsMapper.draft(from: ["colors": JSObject()])
 
         XCTAssertEqual(draft.colors, KhipuColorsDraft())
     }
 
-    func testDescartaValoresDeTipoIncorrectoEnVezDeCrashear() {
+    func testDiscardsWrongTypedValuesInsteadOfCrashing() {
         let draft = KhipuOptionsMapper.draft(from: [
             "title": 123,
             "titleImageUrl": true,
-            "showFooter": "sí",
+            "showFooter": "yes",
             "theme": 7,
-            "colors": "morado"
+            "colors": "purple"
         ])
 
         XCTAssertEqual(draft, KhipuOptionsDraft())
     }
 
-    func testConstruyeLasOpcionesNativasSinCrashear() {
+    func testBuildsTheNativeOptionsWithoutCrashing() {
         XCTAssertNotNil(KhipuOptionsMapper.map(["title": "Demo", "theme": "dark"]))
     }
 }

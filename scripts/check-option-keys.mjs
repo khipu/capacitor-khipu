@@ -1,117 +1,116 @@
 #!/usr/bin/env node
 /**
- * Falla si las cuatro superficies que declaran el vocabulario de opciones dejan de
- * coincidir.
+ * Fails if the four surfaces that declare the options vocabulary stop matching.
  *
- * El contrato entre JS y el nativo es de strings: `src/definitions.ts` lo declara, el
- * mapper de Swift y el plugin de Java lo leen, y el harness lo ofrece. Renombrar una
- * clave en una sola superficie deja el flag sin efecto **en silencio** — ningún test de
- * un lado puede detectar una deriva del otro.
+ * The contract between JS and native is made of strings: `src/definitions.ts` declares
+ * it, the Swift mapper and the Java plugin read it, and the harness offers it. Renaming
+ * a key on just one surface leaves the flag with no effect **silently** — no test on
+ * either side can detect the other one drifting.
  *
- * También cubre el camino de vuelta (nativo → JS): las 8 claves con las que
- * `KhipuPlugin.swift` arma la promesa vía `call.resolve([...])`, contra la interfaz
- * `KhipuResult`. Android queda fuera de esta mitad: `KhipuPlugin.java` delega la forma
- * entera del resultado al SDK (`khipuResult.asJson()`), así que sus claves no están en
- * nuestro fuente y no se pueden extraer. Esa mitad se verifica a mano, comparando los
- * campos que muestra el harness al correr la misma operación en iOS y en Android.
+ * It also covers the way back (native → JS): the 8 keys with which `KhipuPlugin.swift`
+ * builds the promise via `call.resolve([...])`, against the `KhipuResult` interface.
+ * Android is left out of this half: `KhipuPlugin.java` delegates the entire shape of
+ * the result to the SDK (`khipuResult.asJson()`), so its keys are not in our source and
+ * cannot be extracted. That half is verified by hand, comparing the fields the harness
+ * shows when running the same operation on iOS and on Android.
  *
- * Sobre la fragilidad: esto parsea fuente con expresiones regulares. La dirección del
- * fallo es la correcta (el chequeo se rompe y alguien mira, en vez de pasar mientras el
- * protocolo derivó), pero un parser roto podría reportar «todas coinciden» con cero
- * claves en todas. Por eso hay un piso de cordura: si la extracción del contrato
- * devuelve menos claves de las que debería, el problema es el parser y se dice así.
+ * On fragility: this parses source with regular expressions. The failure direction is
+ * the right one (the check breaks and someone looks, instead of passing while the
+ * protocol has drifted), but a broken parser could report "everything matches" with
+ * zero keys everywhere. That's why there's a sanity floor: if contract extraction
+ * returns fewer keys than it should, the parser is the problem and it says so.
  */
 import { readFileSync } from 'node:fs';
 
-// Acepta un directorio base para poder testear con fixtures, igual que la guarda de
-// versiones acepta rutas por argv.
+// Accepts a base directory so this can be tested with fixtures, the same way the
+// versions guard accepts paths via argv.
 const BASE = process.argv[2] ?? '.';
-const CONTRATO = `${BASE}/src/definitions.ts`;
+const CONTRACT = `${BASE}/src/definitions.ts`;
 const SWIFT = `${BASE}/ios/Sources/KhipuPlugin/KhipuOptionsMapper.swift`;
 const JAVA = `${BASE}/android/src/main/java/com/khipu/capacitor/KhipuPlugin.java`;
 const HARNESS = `${BASE}/example/src/js/fields.js`;
 const PLUGIN = `${BASE}/ios/Sources/KhipuPlugin/KhipuPlugin.swift`;
 
-const leer = (path) => readFileSync(path, 'utf8');
-const claves = (fuente, patron) => new Set([...fuente.matchAll(patron)].map((m) => m[1]));
-const sinColors = (conjunto) => new Set([...conjunto].filter((k) => k !== 'colors'));
+const read = (path) => readFileSync(path, 'utf8');
+const keys = (source, pattern) => new Set([...source.matchAll(pattern)].map((m) => m[1]));
+const withoutColors = (set) => new Set([...set].filter((k) => k !== 'colors'));
 
-function interfaz(fuente, nombre) {
-  const bloque = fuente.match(new RegExp(`export interface ${nombre} \\{(.*?)\\n\\}`, 's'));
-  if (!bloque) {
+function interfaceKeys(source, name) {
+  const block = source.match(new RegExp(`export interface ${name} \\{(.*?)\\n\\}`, 's'));
+  if (!block) {
     console.error(
-      `No se pudo extraer la interfaz ${nombre} de ${CONTRATO}. El parser de esta guarda quedó obsoleto.`,
+      `Could not extract interface ${name} from ${CONTRACT}. This guard's parser is out of date.`,
     );
     process.exit(1);
   }
-  return claves(bloque[1], /^\s*(\w+)\s*[?:]/gm);
+  return keys(block[1], /^\s*(\w+)\s*[?:]/gm);
 }
 
-// Camino de vuelta (nativo → JS): las claves con las que iOS arma la promesa que
-// recibe el comercio. Android no es verificable de la misma forma porque delega la
-// forma entera del resultado al SDK (`khipuResult.asJson()`), así que esa mitad se
-// cubre a mano comparando el harness en las dos plataformas.
-function clavesDeResolve(fuente) {
-  const bloque = fuente.match(/call\.resolve\(\[(.*?)\]\)/s);
-  if (!bloque) {
+// The way back (native → JS): the keys with which iOS builds the promise the merchant
+// receives. Android cannot be verified the same way because it delegates the entire
+// shape of the result to the SDK (`khipuResult.asJson()`), so that half is covered by
+// hand, comparing the harness on both platforms.
+function resolveKeys(source) {
+  const block = source.match(/call\.resolve\(\[(.*?)\]\)/s);
+  if (!block) {
     console.error(
-      `No se pudo extraer el bloque \`call.resolve\` de ${PLUGIN}. El parser de esta guarda quedó obsoleto.`,
+      `Could not extract the \`call.resolve\` block from ${PLUGIN}. This guard's parser is out of date.`,
     );
     process.exit(1);
   }
-  return claves(bloque[1], /"(\w+)":/g);
+  return keys(block[1], /"(\w+)":/g);
 }
 
-const contrato = leer(CONTRATO);
-const opciones = sinColors(interfaz(contrato, 'KhipuOptions'));
-const colores = interfaz(contrato, 'KhipuColors');
-const resultado = interfaz(contrato, 'KhipuResult');
+const contract = read(CONTRACT);
+const options = withoutColors(interfaceKeys(contract, 'KhipuOptions'));
+const colors = interfaceKeys(contract, 'KhipuColors');
+const result = interfaceKeys(contract, 'KhipuResult');
 
-// Piso de cordura: si el contrato se lee casi vacío, lo roto es el parser, no el código.
-if (opciones.size < 5 || colores.size < 8 || resultado.size < 5) {
+// Sanity floor: if the contract reads back nearly empty, the parser is broken, not the code.
+if (options.size < 5 || colors.size < 8 || result.size < 5) {
   console.error(
-    `La extracción del contrato devolvió ${opciones.size} opciones, ${colores.size} colores y ` +
-      `${resultado.size} campos de resultado, muy pocas para ser real. El parser de esta guarda ` +
-      `quedó obsoleto: arréglalo en vez de confiar en que las superficies coinciden.`,
+    `Contract extraction returned ${options.size} options, ${colors.size} colors and ` +
+      `${result.size} result fields — too few to be real. This guard's parser is out of ` +
+      `date: fix it instead of trusting that the surfaces match.`,
   );
   process.exit(1);
 }
 
-const swift = leer(SWIFT);
-const java = leer(JAVA);
-const tramos = leer(HARNESS).split('export const COLOR_FIELDS');
+const swift = read(SWIFT);
+const java = read(JAVA);
+const sections = read(HARNESS).split('export const COLOR_FIELDS');
 
-const superficies = [
-  { nombre: `${SWIFT} (opciones)`, esperado: opciones, real: sinColors(claves(swift, /options\["(\w+)"\]/g)) },
-  { nombre: `${SWIFT} (colores)`, esperado: colores, real: claves(swift, /colors\["(\w+)"\]/g) },
-  { nombre: `${JAVA} (opciones)`, esperado: opciones, real: sinColors(claves(java, /options\.\w+\("(\w+)"/g)) },
-  { nombre: `${JAVA} (colores)`, esperado: colores, real: claves(java, /colors\.\w+\("(\w+)"/g) },
-  { nombre: `${HARNESS} (opciones)`, esperado: opciones, real: claves(tramos[0], /key: '(\w+)'/g) },
+const surfaces = [
+  { name: `${SWIFT} (options)`, expected: options, actual: withoutColors(keys(swift, /options\["(\w+)"\]/g)) },
+  { name: `${SWIFT} (colors)`, expected: colors, actual: keys(swift, /colors\["(\w+)"\]/g) },
+  { name: `${JAVA} (options)`, expected: options, actual: withoutColors(keys(java, /options\.\w+\("(\w+)"/g)) },
+  { name: `${JAVA} (colors)`, expected: colors, actual: keys(java, /colors\.\w+\("(\w+)"/g) },
+  { name: `${HARNESS} (options)`, expected: options, actual: keys(sections[0], /key: '(\w+)'/g) },
   {
-    nombre: `${HARNESS} (colores)`,
-    esperado: colores,
-    real: claves(tramos[1].split('export const PRESETS')[0], /key: '(\w+)'/g),
+    name: `${HARNESS} (colors)`,
+    expected: colors,
+    actual: keys(sections[1].split('export const PRESETS')[0], /key: '(\w+)'/g),
   },
-  { nombre: `${PLUGIN} (resultado)`, esperado: resultado, real: clavesDeResolve(leer(PLUGIN)) },
+  { name: `${PLUGIN} (result)`, expected: result, actual: resolveKeys(read(PLUGIN)) },
 ];
 
-let derivo = false;
-for (const { nombre, esperado, real } of superficies) {
-  const falta = [...esperado].filter((k) => !real.has(k));
-  const sobra = [...real].filter((k) => !esperado.has(k));
-  if (falta.length || sobra.length) {
-    derivo = true;
-    console.error(`${nombre} derivó del contrato de ${CONTRATO}:`);
-    if (falta.length) console.error(`  no lee/ofrece: ${falta.join(', ')}`);
-    if (sobra.length) console.error(`  lee/ofrece de más: ${sobra.join(', ')}`);
+let drifted = false;
+for (const { name, expected, actual } of surfaces) {
+  const missing = [...expected].filter((k) => !actual.has(k));
+  const extra = [...actual].filter((k) => !expected.has(k));
+  if (missing.length || extra.length) {
+    drifted = true;
+    console.error(`${name} drifted from the contract in ${CONTRACT}:`);
+    if (missing.length) console.error(`  does not read/offer: ${missing.join(', ')}`);
+    if (extra.length) console.error(`  reads/offers extra: ${extra.join(', ')}`);
   }
 }
 
-if (derivo) {
+if (drifted) {
   process.exit(1);
 }
 
 console.log(
-  `Vocabulario sincronizado en las cuatro superficies: ${opciones.size} opciones, ${colores.size} colores, ` +
-    `y en el resultado que arma iOS: ${resultado.size} campos`,
+  `Vocabulary in sync across every surface: ${options.size} options, ${colors.size} colors, ` +
+    `and ${result.size} fields in the result iOS builds`,
 );

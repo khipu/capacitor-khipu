@@ -1,10 +1,10 @@
 /**
- * Única fuente de verdad de los campos que el harness puede enviar. Refleja la
- * interfaz `KhipuOptions` de `src/definitions.ts`.
+ * Single source of truth for the fields the harness can send. Mirrors the
+ * `KhipuOptions` interface from `src/definitions.ts`.
  *
- * `webSupported: false` marca los campos que `src/web.ts` recibe pero ignora, de
- * modo que el harness pueda advertirlo en vez de dar la impresión de que el flag
- * está roto.
+ * `webSupported: false` marks the fields that `src/web.ts` receives but ignores,
+ * so the harness can flag it instead of giving the impression that the flag is
+ * broken.
  */
 export const OPTION_FIELDS = [
   {
@@ -130,7 +130,7 @@ export const PRESETS = [
   },
 ];
 
-/** Estado inicial: ningún campo incluido, todos con su valor sugerido cargado. */
+/** Initial state: no field included, all loaded with their suggested value. */
 export function initialState() {
   const options = {};
   for (const field of OPTION_FIELDS) {
@@ -145,7 +145,7 @@ export function initialState() {
   return { operationId: '', options, colors: { include: false, fields } };
 }
 
-/** Un preset reemplaza qué se incluye, pero preserva el `operationId` tipeado. */
+/** A preset replaces what's included, but preserves the typed `operationId`. */
 export function applyPreset(state, preset) {
   const next = initialState();
   next.operationId = state.operationId;

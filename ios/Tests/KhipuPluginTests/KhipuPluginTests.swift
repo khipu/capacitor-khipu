@@ -5,14 +5,14 @@ import XCTest
 
 final class KhipuPluginTests: XCTestCase {
 
-    func testDeclaraLaIdentidadQueElPuenteDeCapacitorEspera() {
+    func testDeclaresTheIdentityTheCapacitorBridgeExpects() {
         let plugin = KhipuPlugin()
 
         XCTAssertEqual(plugin.identifier, "KhipuPlugin")
         XCTAssertEqual(plugin.jsName, "Khipu")
     }
 
-    func testExponeSoloStartOperationComoPromesa() {
+    func testExposesOnlyStartOperationAsAPromise() {
         let plugin = KhipuPlugin()
 
         XCTAssertEqual(plugin.pluginMethods.count, 1)
@@ -20,31 +20,31 @@ final class KhipuPluginTests: XCTestCase {
         XCTAssertEqual(plugin.pluginMethods.first?.returnType, "promise")
     }
 
-    /// Doble que permite armar una cadena de presentación sin presentar nada.
+    /// Test double that lets us build a presentation chain without presenting anything.
     ///
-    /// `present(_:animated:)` no es fiable en un test target de SwiftPM sin app
-    /// anfitriona: falla por timeout. En vez de crear la condición real, se
-    /// sobreescribe la propiedad que `topMost` consulta. Lo que se testea es nuestro
-    /// recorrido de la cadena, no el comportamiento de UIKit.
-    private final class ControladorConPresentado: UIViewController {
-        var presentado: UIViewController?
-        override var presentedViewController: UIViewController? { presentado }
+    /// `present(_:animated:)` is not reliable in a SwiftPM test target without a host
+    /// app: it fails by timing out. Instead of creating the real condition, we
+    /// override the property that `topMost` reads. What's under test is our chain
+    /// traversal, not UIKit's behavior.
+    private final class ControllerWithPresented: UIViewController {
+        var presented: UIViewController?
+        override var presentedViewController: UIViewController? { presented }
     }
 
-    func testTopMostDevuelveElMismoControladorCuandoNoHayNadaPresentado() {
-        let solo = ControladorConPresentado()
+    func testTopMostReturnsTheSameControllerWhenNothingIsPresented() {
+        let alone = ControllerWithPresented()
 
-        XCTAssertIdentical(KhipuPlugin.topMost(from: solo), solo)
+        XCTAssertIdentical(KhipuPlugin.topMost(from: alone), alone)
     }
 
-    func testTopMostSigueLaCadenaHastaElUltimoPresentado() {
-        let raiz = ControladorConPresentado()
-        let intermedio = ControladorConPresentado()
-        let ultimo = UIViewController()
+    func testTopMostFollowsTheChainToTheLastPresented() {
+        let root = ControllerWithPresented()
+        let middle = ControllerWithPresented()
+        let last = UIViewController()
 
-        raiz.presentado = intermedio
-        intermedio.presentado = ultimo
+        root.presented = middle
+        middle.presented = last
 
-        XCTAssertIdentical(KhipuPlugin.topMost(from: raiz), ultimo)
+        XCTAssertIdentical(KhipuPlugin.topMost(from: root), last)
     }
 }

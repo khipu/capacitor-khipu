@@ -30,18 +30,18 @@ function render() {
 }
 
 /**
- * Re-dibuja el formulario completo solo cuando cambia `include`, que es lo único
- * que altera el `disabled` del control y el aspecto de la fila. Para un cambio de
- * valor basta refrescar el preview.
+ * Redraws the whole form only when `include` changes, since that's the only thing
+ * that alters the control's `disabled` state and the row's look. For a value
+ * change, refreshing the preview is enough.
  *
- * La distinción no es cosmética: `renderOptions` y `renderColors` usan
- * `replaceChildren`, así que un re-render destruye el input y le quita el foco a
- * quien esté tipeando. Sin esto, escribir en `title`, `titleImageUrl` o `locale`
- * pierde el foco en cada carácter.
+ * The distinction is not cosmetic: `renderOptions` and `renderColors` use
+ * `replaceChildren`, so a re-render destroys the input and steals focus from
+ * whoever is typing. Without this, typing into `title`, `titleImageUrl` or
+ * `locale` loses focus on every character.
  *
- * De paso cierra el riesgo del closure de `ui.js`: los handlers capturan `entry`
- * en el momento del render, y como todo cambio de `include` fuerza un re-render,
- * el `include` capturado nunca queda viejo.
+ * It also closes off `ui.js`'s closure risk: the handlers capture `entry` at
+ * render time, and since every `include` change forces a re-render, the captured
+ * `include` never goes stale.
  */
 function apply(bag, key, entry) {
   const toggled = bag[key].include !== entry.include;
@@ -61,9 +61,9 @@ function commit() {
 }
 
 /**
- * En web, `src/web.ts` recibe el payload completo pero solo implementa `theme`,
- * `lightPrimary`/`darkPrimary`, `skipExitPage` y `skipExitSuccessPage`. Se avisa
- * arriba para que no se lea como un flag roto del plugin.
+ * On web, `src/web.ts` receives the full payload but only implements `theme`,
+ * `lightPrimary`/`darkPrimary`, `skipExitPage` and `skipExitSuccessPage`. This is
+ * flagged above so it doesn't read as a broken plugin flag.
  */
 function platformNote() {
   if (Capacitor.getPlatform() !== 'web') {

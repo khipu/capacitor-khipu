@@ -8,11 +8,11 @@ describe('storage', () => {
     window.localStorage.clear();
   });
 
-  it('sin nada guardado devuelve el fallback', () => {
+  it('with nothing saved returns the fallback', () => {
     expect(loadState(initialState())).toEqual(initialState());
   });
 
-  it('recupera lo que se guardó', () => {
+  it('recovers what was saved', () => {
     const state = initialState();
     state.operationId = 'abc123';
     state.options.showFooter.include = true;
@@ -21,13 +21,13 @@ describe('storage', () => {
     expect(loadState(initialState())).toEqual(state);
   });
 
-  it('ignora un estado guardado corrupto', () => {
+  it('ignores a corrupted saved state', () => {
     window.localStorage.setItem('capacitor-khipu-harness', '{no es json');
 
     expect(loadState(initialState())).toEqual(initialState());
   });
 
-  it('completa los campos que faltan en un estado de una versión anterior', () => {
+  it("fills in the fields missing from an earlier version's state", () => {
     window.localStorage.setItem(
       'capacitor-khipu-harness',
       JSON.stringify({
@@ -47,7 +47,7 @@ describe('storage', () => {
     expect(state.colors.include).toBe(false);
   });
 
-  it('descarta claves guardadas que ya no existen en el esquema', () => {
+  it('discards saved keys that no longer exist in the schema', () => {
     window.localStorage.setItem(
       'capacitor-khipu-harness',
       JSON.stringify({

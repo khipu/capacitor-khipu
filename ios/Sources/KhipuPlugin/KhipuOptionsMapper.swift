@@ -2,19 +2,19 @@ import Capacitor
 import Foundation
 import KhipuClientIOS
 
-/// Traduce el diccionario de opciones que llega desde JS a las opciones nativas
-/// del cliente de Khipu.
+/// Translates the options dictionary coming in from JS into the Khipu client's
+/// native options.
 ///
-/// Descarta los valores de tipo incorrecto en vez de hacer crashear la app: el
-/// mapeo anterior usaba `as!`, así que un `title: 123` enviado desde JS terminaba
-/// en un crash en vez de en un valor ignorado.
+/// Discards wrong-typed values instead of crashing the app: the previous mapping
+/// used `as!`, so a `title: 123` sent from JS ended up crashing instead of being
+/// ignored.
 enum KhipuOptionsMapper {
 
     static func map(_ options: JSObject?) -> KhipuOptions {
         apply(draft(from: options))
     }
 
-    /// JS -> draft. Concentra toda la lógica y es el paso que cubren los tests.
+    /// JS -> draft. Concentrates all the logic and is the step the tests cover.
     static func draft(from options: JSObject?) -> KhipuOptionsDraft {
         var draft = KhipuOptionsDraft()
         guard let options else { return draft }
@@ -36,15 +36,14 @@ enum KhipuOptionsMapper {
         return draft
     }
 
-    /// draft -> `KhipuOptions`. Mecánico: una línea por campo.
+    /// draft -> `KhipuOptions`. Mechanical: one line per field.
     ///
-    /// **Hueco aceptado a propósito, documentado para que sea revisable.** Los tests
-    /// cubren `draft(from:)`, no `apply(_:)`. Si alguien intercambiara `lightPrimary`
-    /// por `lightOnPrimary` aquí, los tests seguirían pasando. Se acepta porque
-    /// `apply(_:)` es una línea por campo, visualmente alineada, y la revisión de
-    /// código lo cubre a ese tamaño. **El límite:** en el momento en que `apply(_:)`
-    /// gane un condicional, una transformación o una rama, deja de ser defendible y
-    /// necesita tests propios.
+    /// **Gap accepted on purpose, documented so it is reviewable.** The tests cover
+    /// `draft(from:)`, not `apply(_:)`. If someone swapped `lightPrimary` for
+    /// `lightOnPrimary` here, the tests would still pass. It's accepted because
+    /// `apply(_:)` is one line per field, visually aligned, and code review covers it
+    /// at that size. **The limit:** the moment `apply(_:)` gains a conditional, a
+    /// transformation, or a branch, it stops being defensible and needs its own tests.
     private static func apply(_ draft: KhipuOptionsDraft) -> KhipuOptions {
         var builder = KhipuOptions.Builder()
 
@@ -102,8 +101,8 @@ enum KhipuOptionsMapper {
         value as? String
     }
 
-    /// Un booleano de JS puede llegar como `Bool` o envuelto en `NSNumber` según
-    /// cómo lo serialice el puente, así que se aceptan ambos.
+    /// A boolean from JS can arrive as `Bool` or wrapped in `NSNumber` depending on
+    /// how the bridge serializes it, so both are accepted.
     private static func bool(_ value: JSValue?) -> Bool? {
         if let value = value as? Bool { return value }
         if let value = value as? NSNumber { return value.boolValue }

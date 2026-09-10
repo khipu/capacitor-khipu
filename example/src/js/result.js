@@ -37,7 +37,7 @@ function eventsTable(events) {
   return table;
 }
 
-/** Los campos opcionales del `KhipuResult` pueden no venir; se omiten en silencio. */
+/** The optional fields of `KhipuResult` might not come through; they are silently omitted. */
 export function renderResult(container, result) {
   const dl = document.createElement('dl');
   for (const key of FIELDS) {

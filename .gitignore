@@ -1,6 +1,6 @@
-# Claude Code: ajustes locales y worktrees. Los worktrees viven en
-# .claude/worktrees/, o sea dentro del repo, así que sin esto prettier y eslint
-# escanean una copia completa del proyecto y fallan sobre archivos generados.
+# Claude Code: local settings and worktrees. Worktrees live in
+# .claude/worktrees/, i.e. inside the repo, so without this prettier and eslint
+# scan a full copy of the project and fail on generated files.
 .claude/
 
 # node files

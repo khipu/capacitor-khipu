@@ -13,13 +13,13 @@ describe('KhipuWeb', () => {
     document.body.innerHTML = '';
   });
 
-  it('monta el contenedor con el id esperado', () => {
+  it('mounts the container with the expected id', () => {
     new KhipuWeb();
 
     expect(document.getElementById('khipu-web-root')).not.toBeNull();
   });
 
-  it('rechaza cuando kws.js nunca inyecta Khipu', async () => {
+  it('rejects when kws.js never injects Khipu', async () => {
     const web = new KhipuWeb();
     const assertion = expect(web.ensureKhipuIsSet()).rejects.toThrow('timeout waiting for kws to inject Khipu');
 

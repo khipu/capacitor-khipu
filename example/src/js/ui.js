@@ -1,9 +1,9 @@
 import { COLOR_FIELDS, OPTION_FIELDS, PRESETS } from './fields.js';
 
 /**
- * Cada fila lleva la casilla `incluir` más el control del valor. El control queda
- * deshabilitado mientras el campo no esté incluido, para que se vea de un golpe
- * qué se va a enviar de verdad.
+ * Each row carries the `include` checkbox plus the value control. The control
+ * stays disabled while the field is not included, so it's obvious at a glance
+ * what will actually be sent.
  */
 function row(field, entry, onChange) {
   const wrapper = document.createElement('div');
