@@ -10,7 +10,6 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import com.khipu.client.KhipuColors;
 import com.khipu.client.KhipuOptions;
 import com.khipu.client.KhipuResult;
 import java.util.Objects;
@@ -26,88 +25,8 @@ public class KhipuPlugin extends Plugin {
             call.reject("Must provide operationId");
             return;
         }
-        KhipuOptions.Builder optionsBuilder = new KhipuOptions.Builder();
-        JSObject options = call.getObject("options", new JSObject());
-
-        assert options != null;
-        if (options.has("title")) {
-            optionsBuilder.topBarTitle(Objects.requireNonNull(options.getString("title")));
-        }
-        if (options.has("titleImageUrl")) {
-            optionsBuilder.topBarImageUrl(Objects.requireNonNull(options.getString("titleImageUrl")));
-        }
-        if (options.has("skipExitPage")) {
-            optionsBuilder.skipExitPage(Boolean.TRUE.equals(options.getBool("skipExitPage")));
-        }
-        if (options.has("skipExitSuccessPage")) {
-            optionsBuilder.skipExitSuccessPage(Boolean.TRUE.equals(options.getBool("skipExitSuccessPage")));
-        }
-        if (options.has("showFooter")) {
-            optionsBuilder.showFooter(Boolean.TRUE.equals(options.getBool("showFooter")));
-        }
-        if (options.has("showMerchantLogo")) {
-            optionsBuilder.showMerchantLogo(Boolean.TRUE.equals(options.getBool("showMerchantLogo")));
-        }
-        if (options.has("showPaymentDetails")) {
-            optionsBuilder.showPaymentDetails(Boolean.TRUE.equals(options.getBool("showPaymentDetails")));
-        }
-        if (options.has("locale")) {
-            optionsBuilder.locale(Objects.requireNonNull(options.getString("locale")));
-        }
-        if (options.has("theme")) {
-            String theme = options.getString("theme");
-            if ("light".equals(theme)) {
-                optionsBuilder.theme(KhipuOptions.Theme.LIGHT);
-            } else if ("dark".equals(theme)) {
-                optionsBuilder.theme(KhipuOptions.Theme.DARK);
-            } else if ("system".equals(theme)) {
-                optionsBuilder.theme(KhipuOptions.Theme.SYSTEM);
-            }
-        }
-
-        KhipuColors.Builder colorsBuilder = new KhipuColors.Builder();
-        if (options.has("colors")) {
-            JSObject colors = options.getJSObject("colors");
-            assert colors != null;
-            if (colors.has("lightBackground")) {
-                colorsBuilder.lightBackground(Objects.requireNonNull(colors.getString("lightBackground")));
-            }
-            if (colors.has("lightOnBackground")) {
-                colorsBuilder.lightOnBackground(Objects.requireNonNull(colors.getString("lightOnBackground")));
-            }
-            if (colors.has("lightPrimary")) {
-                colorsBuilder.lightPrimary(Objects.requireNonNull(colors.getString("lightPrimary")));
-            }
-            if (colors.has("lightOnPrimary")) {
-                colorsBuilder.lightOnPrimary(Objects.requireNonNull(colors.getString("lightOnPrimary")));
-            }
-            if (colors.has("lightTopBarContainer")) {
-                colorsBuilder.lightTopBarContainer(Objects.requireNonNull(colors.getString("lightTopBarContainer")));
-            }
-            if (colors.has("lightOnTopBarContainer")) {
-                colorsBuilder.lightOnTopBarContainer(Objects.requireNonNull(colors.getString("lightOnTopBarContainer")));
-            }
-            if (colors.has("darkBackground")) {
-                colorsBuilder.darkBackground(Objects.requireNonNull(colors.getString("darkBackground")));
-            }
-            if (colors.has("darkOnBackground")) {
-                colorsBuilder.darkOnBackground(Objects.requireNonNull(colors.getString("darkOnBackground")));
-            }
-            if (colors.has("darkPrimary")) {
-                colorsBuilder.darkPrimary(Objects.requireNonNull(colors.getString("darkPrimary")));
-            }
-            if (colors.has("darkOnPrimary")) {
-                colorsBuilder.darkOnPrimary(Objects.requireNonNull(colors.getString("darkOnPrimary")));
-            }
-            if (colors.has("darkTopBarContainer")) {
-                colorsBuilder.darkTopBarContainer(Objects.requireNonNull(colors.getString("darkTopBarContainer")));
-            }
-            if (colors.has("darkOnTopBarContainer")) {
-                colorsBuilder.darkOnTopBarContainer(Objects.requireNonNull(colors.getString("darkOnTopBarContainer")));
-            }
-        }
-        optionsBuilder.colors(colorsBuilder.build());
-        startActivityForResult(call, getKhipuLauncherIntent(getContext(), operationId, optionsBuilder.build()), "operationResult");
+        KhipuOptions options = KhipuOptionsMapper.map(call.getObject("options", new JSObject()));
+        startActivityForResult(call, getKhipuLauncherIntent(getContext(), operationId, options), "operationResult");
     }
 
     @ActivityCallback

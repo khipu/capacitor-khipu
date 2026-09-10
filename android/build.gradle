@@ -54,6 +54,8 @@ dependencies {
     implementation 'com.khipu:khipu-client-android:2.28.1'
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     testImplementation "junit:junit:$junitVersion"
+    testImplementation 'org.json:json:20250517'
+    testImplementation 'org.mockito:mockito-core:5.20.0'
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
 }
