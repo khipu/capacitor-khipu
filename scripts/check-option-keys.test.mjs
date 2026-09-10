@@ -28,8 +28,28 @@ function write(dir, relative, content) {
   writeFileSync(destination, content);
 }
 
-/** Builds the five surfaces. Each one can drift independently. */
-function fixture({ contract = OPTIONS, harness = OPTIONS, resolve = RESULT } = {}) {
+function webSource({
+  reads = ['title', 'locale', 'theme'],
+  unsupported = ['showFooter', 'showMerchantLogo', 'showPaymentDetails'],
+} = {}) {
+  const body = reads.map((key) => `  void opts.${key};`).join('\n');
+  const list = unsupported.map((key) => `  '${key}',`).join('\n');
+  const colors = COLORS.slice(0, 2)
+    .map((key) => `  void colors?.${key};`)
+    .join('\n');
+  const unsupportedColors = COLORS.slice(2)
+    .map((key) => `  '${key}',`)
+    .join('\n');
+
+  return (
+    `export const WEB_UNSUPPORTED = [\n${list}\n];\n\n` +
+    `export const WEB_UNSUPPORTED_COLORS = [\n${unsupportedColors}\n];\n\n` +
+    `function run(opts, colors) {\n${body}\n  void opts.colors;\n${colors}\n}\n`
+  );
+}
+
+/** Builds the six surfaces. Each one can drift independently. */
+function fixture({ contract = OPTIONS, harness = OPTIONS, resolve = RESULT, web = {} } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'khipu-keys-'));
 
   const fields = (keys) => keys.map((k) => `  ${k}: string | undefined;`).join('\n');
@@ -70,6 +90,8 @@ function fixture({ contract = OPTIONS, harness = OPTIONS, resolve = RESULT } = {
     `func startOperation() {\n    call.resolve([\n${resolves(resolve)}\n    ])\n}\n`,
   );
 
+  write(dir, 'src/web.ts', webSource(web));
+
   return dir;
 }
 
@@ -83,7 +105,7 @@ function run(base) {
 }
 
 describe('check-option-keys', () => {
-  it('passes when all five surfaces match', () => {
+  it('passes when all six surfaces match', () => {
     const result = run(fixture());
 
     expect(result.code).toBe(0);
@@ -119,12 +141,39 @@ describe('check-option-keys', () => {
     expect(result.output).toContain("This guard's parser is out of date");
   });
 
-  it("with the repo's real files all five surfaces match", () => {
+  it('fails when an option is neither read by web nor listed as unsupported', () => {
+    const result = run(
+      fixture({
+        web: { reads: ['title', 'locale'], unsupported: ['showFooter', 'showMerchantLogo', 'showPaymentDetails'] },
+      }),
+    );
+
+    expect(result.code).toBe(1);
+    expect(result.output).toContain('web.ts (options) drifted');
+    expect(result.output).toContain('does not read/offer: theme');
+  });
+
+  it('fails when an option is both read by web and listed as unsupported', () => {
+    const result = run(
+      fixture({
+        web: {
+          reads: ['title', 'locale', 'theme'],
+          unsupported: ['theme', 'showFooter', 'showMerchantLogo', 'showPaymentDetails'],
+        },
+      }),
+    );
+
+    expect(result.code).toBe(1);
+    expect(result.output).toContain('both read and listed as unsupported: theme');
+  });
+
+  it("with the repo's real files every surface matches, including web", () => {
     const result = run('.');
 
     expect(result.code).toBe(0);
     expect(result.output).toContain('9 options');
     expect(result.output).toContain('12 colors');
     expect(result.output).toContain('8 fields');
+    expect(result.output).toContain('4 options honoured with 5 declared unsupported');
   });
 });

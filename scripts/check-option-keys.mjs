@@ -1,11 +1,18 @@
 #!/usr/bin/env node
 /**
- * Fails if the four surfaces that declare the options vocabulary stop matching.
+ * Fails if the five surfaces that declare the options vocabulary stop matching.
  *
  * The contract between JS and native is made of strings: `src/definitions.ts` declares
  * it, the Swift mapper and the Java plugin read it, and the harness offers it. Renaming
  * a key on just one surface leaves the flag with no effect **silently** — no test on
  * either side can detect the other one drifting.
+ *
+ * `src/web.ts` is the fifth surface, and the one drift is otherwise invisible on: no
+ * test compares it to the contract, and nothing else reads it. Its options and colours
+ * must partition into exactly two sets — read by the web layer, or declared in
+ * `WEB_UNSUPPORTED`/`WEB_UNSUPPORTED_COLORS` — never both, never neither, so a new
+ * contract key forces someone to decide what web does with it instead of letting it be
+ * silently dropped.
  *
  * It also covers the way back (native → JS): the 8 keys with which `KhipuPlugin.swift`
  * builds the promise via `call.resolve([...])`, against the `KhipuResult` interface.
@@ -30,6 +37,7 @@ const SWIFT = `${BASE}/ios/Sources/KhipuPlugin/KhipuOptionsMapper.swift`;
 const JAVA = `${BASE}/android/src/main/java/com/khipu/capacitor/KhipuPlugin.java`;
 const HARNESS = `${BASE}/example/src/js/fields.js`;
 const PLUGIN = `${BASE}/ios/Sources/KhipuPlugin/KhipuPlugin.swift`;
+const WEB = `${BASE}/src/web.ts`;
 
 const read = (path) => readFileSync(path, 'utf8');
 const keys = (source, pattern) => new Set([...source.matchAll(pattern)].map((m) => m[1]));
@@ -38,9 +46,7 @@ const withoutColors = (set) => new Set([...set].filter((k) => k !== 'colors'));
 function interfaceKeys(source, name) {
   const block = source.match(new RegExp(`export interface ${name} \\{(.*?)\\n\\}`, 's'));
   if (!block) {
-    console.error(
-      `Could not extract interface ${name} from ${CONTRACT}. This guard's parser is out of date.`,
-    );
+    console.error(`Could not extract interface ${name} from ${CONTRACT}. This guard's parser is out of date.`);
     process.exit(1);
   }
   return keys(block[1], /^\s*(\w+)\s*[?:]/gm);
@@ -53,12 +59,20 @@ function interfaceKeys(source, name) {
 function resolveKeys(source) {
   const block = source.match(/call\.resolve\(\[(.*?)\]\)/s);
   if (!block) {
-    console.error(
-      `Could not extract the \`call.resolve\` block from ${PLUGIN}. This guard's parser is out of date.`,
-    );
+    console.error(`Could not extract the \`call.resolve\` block from ${PLUGIN}. This guard's parser is out of date.`);
     process.exit(1);
   }
   return keys(block[1], /"(\w+)":/g);
+}
+
+/** Keys inside an exported array literal, e.g. `export const WEB_UNSUPPORTED = [...]`. */
+function listed(source, name) {
+  const block = source.match(new RegExp(`export const ${name}[^=]*=\\s*\\[(.*?)\\]`, 's'));
+  if (!block) {
+    console.error(`Could not extract ${name} from ${WEB}. This guard's parser is out of date.`);
+    process.exit(1);
+  }
+  return keys(block[1], /'(\w+)'/g);
 }
 
 const contract = read(CONTRACT);
@@ -80,6 +94,26 @@ const swift = read(SWIFT);
 const java = read(JAVA);
 const sections = read(HARNESS).split('export const COLOR_FIELDS');
 
+const web = read(WEB);
+const webUnsupported = listed(web, 'WEB_UNSUPPORTED');
+const webUnsupportedColors = listed(web, 'WEB_UNSUPPORTED_COLORS');
+const webReads = withoutColors(keys(web, /\bopts\.(\w+)/g));
+const webReadsColors = keys(web, /\bcolors\??\.(\w+)/g);
+
+// Sanity floor: the same failure mode as the contract's above. `listed()` already exits
+// loudly when it cannot find the array at all, but a reshaped array (different quoting,
+// a different literal shape) can match the outer regex and still yield zero keys. That
+// would make the partition below look "clean" — nothing read, nothing unsupported — for
+// the wrong reason.
+if (webUnsupported.size < 2 || webUnsupportedColors.size < 4) {
+  console.error(
+    `${WEB} extraction returned ${webUnsupported.size} unsupported options and ` +
+      `${webUnsupportedColors.size} unsupported colors — too few to be real. This guard's ` +
+      `parser is out of date: fix it instead of trusting that the surfaces match.`,
+  );
+  process.exit(1);
+}
+
 const surfaces = [
   { name: `${SWIFT} (options)`, expected: options, actual: withoutColors(keys(swift, /options\["(\w+)"\]/g)) },
   { name: `${SWIFT} (colors)`, expected: colors, actual: keys(swift, /colors\["(\w+)"\]/g) },
@@ -92,6 +126,8 @@ const surfaces = [
     actual: keys(sections[1].split('export const PRESETS')[0], /key: '(\w+)'/g),
   },
   { name: `${PLUGIN} (result)`, expected: result, actual: resolveKeys(read(PLUGIN)) },
+  { name: `${WEB} (options)`, expected: options, actual: new Set([...webReads, ...webUnsupported]) },
+  { name: `${WEB} (colors)`, expected: colors, actual: new Set([...webReadsColors, ...webUnsupportedColors]) },
 ];
 
 let drifted = false;
@@ -106,11 +142,27 @@ for (const { name, expected, actual } of surfaces) {
   }
 }
 
+// An option must be in exactly one of "read" or "declared unsupported" — never both.
+// Overlap is its own drift, distinct from the coverage check above: two sets can each
+// pass that check (nothing missing, nothing extra in the union) while still double
+// counting a key that both claim.
+for (const [label, reads, unsupported] of [
+  [`${WEB} (options)`, webReads, webUnsupported],
+  [`${WEB} (colors)`, webReadsColors, webUnsupportedColors],
+]) {
+  const both = [...reads].filter((k) => unsupported.has(k));
+  if (both.length) {
+    drifted = true;
+    console.error(`${label}: both read and listed as unsupported: ${both.join(', ')}`);
+  }
+}
+
 if (drifted) {
   process.exit(1);
 }
 
 console.log(
   `Vocabulary in sync across every surface: ${options.size} options, ${colors.size} colors, ` +
-    `and ${result.size} fields in the result iOS builds`,
+    `${result.size} fields in the result iOS builds, and on web ${webReads.size} options ` +
+    `honoured with ${webUnsupported.size} declared unsupported`,
 );
