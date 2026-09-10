@@ -1428,12 +1428,23 @@ public class KhipuOptionsMapperTest {
 }
 ```
 
-**Fallback if the getters do not exist.** `KhipuOptions` is a Kotlin class whose
-properties read as `val` in the source, so `getTopBarTitle()` and friends should be
-generated. If they are not accessible from Java, replicate the iOS approach: add a
-`KhipuOptionsDraft` value class in `com.khipu.capacitor`, have the mapper expose
-`static KhipuOptionsDraft draft(JSObject)` plus `static KhipuOptions map(JSObject)`, and
-assert on the draft. Decide this by compiling the test, not by guessing.
+**The getters exist — settled before dispatch, do not spend time on it.** Checked
+against the SDK source: `KhipuOptions` declares `topBarTitle`, `topBarImageUrl`,
+`skipExitPage`, `skipExitSuccessPage`, `theme`, `colors`, `locale`, `showFooter`,
+`showMerchantLogo` and `showPaymentDetails` as `val` primary-constructor properties of
+a public class, so Kotlin generates `getTopBarTitle()`, `getSkipExitPage()`,
+`getTheme()` and the rest for Java. `KhipuColors` has the same shape and `KhipuEvent`
+exposes `getName()`, `getTimestamp()`, `getType()`.
+
+So assert on the built `KhipuOptions` directly. The draft indirection the Swift mapper
+needs has no reason to exist here: it is there because `KhipuClientIOS` marks its
+properties internal, and that constraint does not apply on this side. `KhipuOptions`'
+constructor is private — only the Builder can build one, which is what the mapper uses.
+
+If you ever need to inspect the AAR itself, use `grep -a`: BSD grep silently skips
+binary files and reports zero matches, so a search without it can report something
+absent when it is right there. Validate any such search with a control pattern you know
+is present.
 
 - [ ] **Step 3: Run it and watch it fail**
 
