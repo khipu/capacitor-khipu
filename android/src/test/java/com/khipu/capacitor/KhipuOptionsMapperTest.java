@@ -7,6 +7,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.getcapacitor.JSObject;
+import com.khipu.client.KhipuColors;
 import com.khipu.client.KhipuOptions;
 import org.json.JSONException;
 import org.junit.Test;
@@ -130,19 +131,39 @@ public class KhipuOptionsMapperTest {
 
     @Test
     public void mapsTheTwelveColors() throws JSONException {
+        // Each of the twelve is a distinct value, on purpose: the option-keys guard
+        // already protects against a renamed key (verified separately -- renaming
+        // "darkTopBarContainer" in the mapper makes verify:keys fail, naming both the
+        // missing and the extra key), but it can't see a swap of two correct keys to
+        // the wrong builder method, e.g. `builder.lightOnBackground(lightBackground)`.
+        // Distinct values make that swap show up as a wrong value here instead of
+        // passing by coincidence, which repeated hex strings (the previous fixture
+        // reused "#FFFFFF", "#8347AD" and "#3CB4E5" across unrelated fields) would let
+        // slip through undetected.
         KhipuOptions options = KhipuOptionsMapper.map(
             new JSObject(
-                "{\"colors\":{\"lightBackground\":\"#FFFFFF\",\"lightOnBackground\":\"#1A1A1A\"," +
-                "\"lightPrimary\":\"#8347AD\",\"lightOnPrimary\":\"#FFFFFF\"," +
-                "\"lightTopBarContainer\":\"#8347AD\",\"lightOnTopBarContainer\":\"#FFFFFF\"," +
-                "\"darkBackground\":\"#121212\",\"darkOnBackground\":\"#EDEDED\"," +
-                "\"darkPrimary\":\"#3CB4E5\",\"darkOnPrimary\":\"#0B0B0B\"," +
-                "\"darkTopBarContainer\":\"#1E1E1E\",\"darkOnTopBarContainer\":\"#3CB4E5\"}}"
+                "{\"colors\":{\"lightBackground\":\"#111111\",\"lightOnBackground\":\"#222222\"," +
+                "\"lightPrimary\":\"#333333\",\"lightOnPrimary\":\"#444444\"," +
+                "\"lightTopBarContainer\":\"#555555\",\"lightOnTopBarContainer\":\"#666666\"," +
+                "\"darkBackground\":\"#777777\",\"darkOnBackground\":\"#888888\"," +
+                "\"darkPrimary\":\"#999999\",\"darkOnPrimary\":\"#AAAAAA\"," +
+                "\"darkTopBarContainer\":\"#BBBBBB\",\"darkOnTopBarContainer\":\"#CCCCCC\"}}"
             )
         );
 
-        assertEquals("#8347AD", options.getColors().getLightPrimary());
-        assertEquals("#3CB4E5", options.getColors().getDarkPrimary());
+        KhipuColors colors = options.getColors();
+        assertEquals("#111111", colors.getLightBackground());
+        assertEquals("#222222", colors.getLightOnBackground());
+        assertEquals("#333333", colors.getLightPrimary());
+        assertEquals("#444444", colors.getLightOnPrimary());
+        assertEquals("#555555", colors.getLightTopBarContainer());
+        assertEquals("#666666", colors.getLightOnTopBarContainer());
+        assertEquals("#777777", colors.getDarkBackground());
+        assertEquals("#888888", colors.getDarkOnBackground());
+        assertEquals("#999999", colors.getDarkPrimary());
+        assertEquals("#AAAAAA", colors.getDarkOnPrimary());
+        assertEquals("#BBBBBB", colors.getDarkTopBarContainer());
+        assertEquals("#CCCCCC", colors.getDarkOnTopBarContainer());
     }
 
     @Test
