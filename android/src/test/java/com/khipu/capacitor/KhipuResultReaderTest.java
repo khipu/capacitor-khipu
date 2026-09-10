@@ -12,8 +12,22 @@ import org.junit.Test;
 
 public class KhipuResultReaderTest {
 
+    // Every field carries a distinct, non-empty value, on purpose: a swap between any
+    // two same-typed getters in the reader (getExitTitle() <-> getExitMessage(),
+    // getExitUrl() <-> getContinueUrl()) must show up as a wrong value here instead of
+    // passing by coincidence, which the previous fixture -- exitTitle and exitMessage
+    // both "", exitUrl and continueUrl always null -- let slip through undetected.
     private static KhipuResult canceled() {
-        return new KhipuResult("op-1", "", "", null, null, "ERROR", new KhipuEvent[0], "USER_CANCELED");
+        return new KhipuResult(
+            "op-1",
+            "Payment canceled",
+            "You canceled the payment before it was completed.",
+            "https://khipu.com/payment/exit",
+            "https://khipu.com/payment/continue",
+            "ERROR",
+            new KhipuEvent[0],
+            "USER_CANCELED"
+        );
     }
 
     @Test
@@ -21,13 +35,32 @@ public class KhipuResultReaderTest {
         JSObject result = KhipuResultReader.read(canceled());
 
         assertEquals("op-1", result.getString("operationId"));
+        assertEquals("Payment canceled", result.getString("exitTitle"));
+        assertEquals("You canceled the payment before it was completed.", result.getString("exitMessage"));
         assertEquals("ERROR", result.getString("result"));
+        assertEquals("https://khipu.com/payment/exit", result.getString("exitUrl"));
+        assertEquals("https://khipu.com/payment/continue", result.getString("continueUrl"));
         assertEquals("USER_CANCELED", result.getString("failureReason"));
+        assertTrue(result.has("events"));
     }
 
     @Test
     public void omitsTheKeysThatHaveNoValue() {
-        JSObject result = KhipuResultReader.read(canceled());
+        // A dedicated fixture, not canceled(): canceled() now carries every field so
+        // readsEveryContractField can assert all eight, so the omission case needs its
+        // own KhipuResult with exitUrl and continueUrl genuinely absent.
+        KhipuResult withoutOptionalFields = new KhipuResult(
+            "op-1",
+            "Payment canceled",
+            "You canceled the payment before it was completed.",
+            null,
+            null,
+            "ERROR",
+            new KhipuEvent[0],
+            "USER_CANCELED"
+        );
+
+        JSObject result = KhipuResultReader.read(withoutOptionalFields);
 
         assertFalse(result.has("exitUrl"));
         assertFalse(result.has("continueUrl"));
