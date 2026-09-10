@@ -253,10 +253,22 @@ existing iOS merchants receive. That is a scope decision beyond this pass and it
 `docs/STATUS.md`.
 
 Note the interaction the Android SDK team flagged: `IKW-1233` makes `asJson()` use
-`serializeNulls()`, so the SDK will start emitting these three keys as `null` to match
-iOS. Our reader omits nulls, so once that lands the merchant-visible result is
-unchanged and the divergence persists — by our choice, not the SDK's. That is a reason
-to decide, not a reason to change the reader silently.
+`serializeNulls()`, so the SDK will start emitting these three keys as `null`. Our
+reader omits nulls, so once that lands the merchant-visible result is unchanged.
+
+That is not us perpetuating a divergence out of inertia, and the distinction is worth
+stating because it changes what the right fix is. The two layers have different
+contracts, and the SDK team's argument for `null` at their layer is independent of
+iOS: **omission is lossy.** With the key absent, a consumer cannot tell "this field is
+null" from "this SDK version does not have this field". With `null` present it can, and
+the reduction only runs one way — a consumer who wants `undefined` can normalise `null`
+to absent, but nobody downstream can recover a distinction that was already thrown
+away. Emitting the more informative form and reducing at each boundary is right.
+
+**We are that boundary, and the real inconsistency is that we only reduce on one side
+of it.** Android's reader omits; iOS passes `null` straight through. Aligning means
+making iOS reduce too, which is the same conclusion as before, reached from a better
+argument than "match the other platform".
 
 ## D. Web layer
 
