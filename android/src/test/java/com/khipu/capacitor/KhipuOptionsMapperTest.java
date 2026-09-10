@@ -69,12 +69,24 @@ public class KhipuOptionsMapperTest {
         // hardcoded regardless of input -- is mapsTheThreeThemes above, which maps
         // "light" and "dark" to non-default values.
         //
-        // What this cannot tell apart, and no assertion on the built KhipuOptions can:
-        // theme() returning null for malformed input (so the builder's own default
-        // stands) versus theme() itself hardcoding a fallback of Theme.SYSTEM. Both
-        // produce the identical, correct result for every malformed input, so they are
-        // behaviorally indistinguishable from outside the mapper.
+        // On its own, this can't tell "discarded, so the builder's own default stands"
+        // apart from "theme() itself hardcodes a fallback of Theme.SYSTEM": both give
+        // the identical, correct result here, since the SDK's default happens to also
+        // be SYSTEM today. themeDiscardsMalformedInputInsteadOfHardcodingTheDefault
+        // below asserts on the helper directly and does tell them apart.
         assertEquals(KhipuOptions.Theme.SYSTEM, KhipuOptionsMapper.map(new JSObject("{\"theme\":7}")).getTheme());
+    }
+
+    @Test
+    public void themeDiscardsMalformedInputInsteadOfHardcodingTheDefault() throws JSONException {
+        // theme() is package-private specifically so this can assert on it directly,
+        // not through map()'s built KhipuOptions: discarding must produce null (letting
+        // the SDK's own default apply and keep tracking it if it ever changes), not a
+        // value frozen here that only happens to match today's default. A control --
+        // "dark" isn't the default, so a hardcoded-fallback mutant would fail it too --
+        // sits alongside the malformed case.
+        assertNull(KhipuOptionsMapper.theme(new JSObject("{\"theme\":7}")));
+        assertEquals(KhipuOptions.Theme.DARK, KhipuOptionsMapper.theme(new JSObject("{\"theme\":\"dark\"}")));
     }
 
     @Test

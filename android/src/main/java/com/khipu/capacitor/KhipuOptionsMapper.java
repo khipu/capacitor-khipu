@@ -114,7 +114,16 @@ final class KhipuOptionsMapper {
         return value instanceof Boolean ? (Boolean) value : null;
     }
 
-    private static KhipuOptions.Theme theme(JSObject options) {
+    /**
+     * Package-private, not private, so the test can assert directly on it: a
+     * discarded/absent theme must come back as {@code null}, not a hardcoded
+     * {@code Theme.SYSTEM}, even though the two are behaviorally identical through
+     * {@link #map} today (the builder's own default happens to also be
+     * {@code Theme.SYSTEM}). Returning {@code null} lets the SDK's own default apply,
+     * so this mapper keeps tracking it if it ever changes; hardcoding it here would
+     * freeze today's value instead.
+     */
+    static KhipuOptions.Theme theme(JSObject options) {
         String value = string(options, "theme");
         if ("light".equals(value)) return KhipuOptions.Theme.LIGHT;
         if ("dark".equals(value)) return KhipuOptions.Theme.DARK;
