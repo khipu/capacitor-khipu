@@ -73,3 +73,6 @@ captures
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild
+
+# Scratch space for subagent-driven execution: ledger, briefs, review packages.
+.superpowers/
