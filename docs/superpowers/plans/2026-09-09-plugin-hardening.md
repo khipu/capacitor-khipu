@@ -902,9 +902,19 @@ interface KwsSettings {
 }
 
 declare global {
-  interface Window {
-    Khipu?: new () => KwsWidget;
-  }
+  /**
+   * kws.js declares `class Khipu` at the top level of a classic script.
+   *
+   * A top-level `class` creates a binding in the global **lexical** environment, not a
+   * property of the global object, so `window.Khipu` stays `undefined` no matter how
+   * successfully the script loaded. This has to be read as a bare identifier.
+   *
+   * The original code did exactly that, behind three `@ts-ignore`s, and this plan's
+   * first draft replaced them with a `window.Khipu` read as a cleanup. Every real call
+   * then failed on a successful load. **The `@ts-ignore`s were load-bearing** — the
+   * declaration below is how you keep the mechanism and lose the suppressions.
+   */
+  const Khipu: (new () => KwsWidget) | undefined;
 }
 
 /**
@@ -953,8 +963,10 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
    * registered.
    */
   private widget(): Promise<KwsWidget> {
-    if (window.Khipu) {
-      return Promise.resolve(new window.Khipu());
+    // `typeof` on an undeclared identifier does not throw, which is why this is safe
+    // before the script has ever loaded.
+    if (typeof Khipu !== 'undefined') {
+      return Promise.resolve(new Khipu());
     }
 
     this.loading ??= new Promise<KwsWidget>((resolve, reject) => {
@@ -966,8 +978,8 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
 
       script.addEventListener('load', () => {
         clearTimeout(timer);
-        if (window.Khipu) {
-          resolve(new window.Khipu());
+        if (typeof Khipu !== 'undefined') {
+          resolve(new Khipu());
         } else {
           reject(new Error('kws.js loaded but never defined Khipu'));
         }
@@ -981,6 +993,12 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
       script.type = 'text/javascript';
       script.src = KhipuWeb.SCRIPT_SRC;
       document.head.appendChild(script);
+      // A DOM-level check for an existing `#kws_script_id` belongs here too: it is the
+      // only guard that survives a second KhipuWeb instance or a page that already
+      // loaded the script. Reuse that element instead of appending a second one, and
+      // when reusing it, check the global once immediately — a script that already
+      // fired `load` will not fire it again, and waiting for the timeout instead is a
+      // ten-second stall for a script that is right there.
     }).catch((error: unknown) => {
       // Do not cache a failure: a later call should be free to try again.
       this.loading = undefined;
