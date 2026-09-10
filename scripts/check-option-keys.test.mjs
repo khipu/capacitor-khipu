@@ -48,8 +48,8 @@ function webSource({
   );
 }
 
-/** Builds the six surfaces. Each one can drift independently. */
-function fixture({ contract = OPTIONS, harness = OPTIONS, resolve = RESULT, web = {} } = {}) {
+/** Builds the seven source files backing the guard's surfaces. Each one can drift independently. */
+function fixture({ contract = OPTIONS, harness = OPTIONS, resolve = RESULT, androidResult = RESULT, web = {} } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'khipu-keys-'));
 
   const fields = (keys) => keys.map((k) => `  ${k}: string | undefined;`).join('\n');
@@ -95,6 +95,13 @@ function fixture({ contract = OPTIONS, harness = OPTIONS, resolve = RESULT, web 
     `func startOperation() {\n    call.resolve([\n${resolves(resolve)}\n    ])\n}\n`,
   );
 
+  const puts = (keys) => keys.map((k) => `        put(result, "${k}", source.get());`).join('\n');
+  write(
+    dir,
+    'android/src/main/java/com/khipu/capacitor/KhipuResultReader.java',
+    `class KhipuResultReader {\n    static JSObject read() {\n${puts(androidResult)}\n    }\n}\n`,
+  );
+
   write(dir, 'src/web.ts', webSource(web));
 
   return dir;
@@ -110,7 +117,7 @@ function run(base) {
 }
 
 describe('check-option-keys', () => {
-  it('passes when all six surfaces match', () => {
+  it('passes when all seven surfaces match', () => {
     const result = run(fixture());
 
     expect(result.code).toBe(0);
@@ -137,6 +144,15 @@ describe('check-option-keys', () => {
     expect(result.output).toContain('KhipuPlugin.swift (result) drifted');
     expect(result.output).toContain('does not read/offer: exitTitle');
     expect(result.output).toContain('reads/offers extra: exitTitleX');
+  });
+
+  it('fails when the Android result drifts from the contract', () => {
+    const drifted = RESULT.map((k) => (k === 'exitMessage' ? 'exitMessageX' : k));
+    const result = run(fixture({ androidResult: drifted }));
+
+    expect(result.code).toBe(1);
+    expect(result.output).toContain('KhipuResultReader.java (result) drifted');
+    expect(result.output).toContain('does not read/offer: exitMessage');
   });
 
   it('trips the sanity floor when the contract reads back nearly empty', () => {
