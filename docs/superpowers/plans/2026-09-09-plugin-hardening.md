@@ -2151,6 +2151,12 @@ Then rewrite the comment at the top of the file: the return path is no longer
 half-covered, and the reason Android used to be exempt — that `asJson()` put the field
 names out of reach — no longer applies.
 
+**And fix the success line**, which currently ends `... and ${result.size} fields in the
+result iOS builds`. After this task both platforms are checked, so a message still
+crediting only iOS is a guard telling you something untrue about its own coverage —
+the same class of problem as the stale header comment, and easier to miss because it
+prints on every green run.
+
 - [ ] **Step 4: Run everything**
 
 Run: `npm test && npm run verify:keys`
