@@ -90,6 +90,40 @@ public class KhipuOptionsMapperTest {
     }
 
     @Test
+    public void mapsTheRemainingBooleanFields() throws JSONException {
+        // Builder defaults: skipExitPage=false, skipExitSuccessPage=false,
+        // showMerchantLogo=true, showPaymentDetails=true. Each value sent here is the
+        // opposite of its own default, so a mapper that never wired one of these four
+        // fields at all -- distinct from showFooter, which is exercised above -- would
+        // leave the default standing and fail here, rather than only looking covered
+        // by inheriting showFooter's already-tested wiring.
+        KhipuOptions options = KhipuOptionsMapper.map(
+            new JSObject(
+                "{\"skipExitPage\":true,\"skipExitSuccessPage\":true," +
+                "\"showMerchantLogo\":false,\"showPaymentDetails\":false}"
+            )
+        );
+
+        assertTrue(options.getSkipExitPage());
+        assertTrue(options.getSkipExitSuccessPage());
+        assertFalse(options.getShowMerchantLogo());
+        assertFalse(options.getShowPaymentDetails());
+    }
+
+    @Test
+    public void boolDiscardsMalformedInputInsteadOfHardcodingATruthValue() throws JSONException {
+        // bool() is package-private for the same reason as theme(): asserting on it
+        // directly, rather than only through one of the five fields that call it via
+        // map(), tells apart "discarded, so the SDK's own default stands" from "this
+        // helper itself hardcodes a truth value". A hardcoded `return true;` or
+        // `return false;` in its discard branch would fail this immediately, no matter
+        // which of the five boolean fields a map()-level test happens to exercise.
+        assertNull(KhipuOptionsMapper.bool(new JSObject("{\"showFooter\":\"yes\"}"), "showFooter"));
+        assertEquals(Boolean.TRUE, KhipuOptionsMapper.bool(new JSObject("{\"showFooter\":true}"), "showFooter"));
+        assertEquals(Boolean.FALSE, KhipuOptionsMapper.bool(new JSObject("{\"showFooter\":false}"), "showFooter"));
+    }
+
+    @Test
     public void discardsAnExplicitNullInsteadOfThrowing() throws JSONException {
         assertNull(KhipuOptionsMapper.map(new JSObject("{\"title\":null}")).getTopBarTitle());
     }

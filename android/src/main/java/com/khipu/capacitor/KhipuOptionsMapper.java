@@ -108,8 +108,17 @@ final class KhipuOptionsMapper {
         return value instanceof String ? (String) value : null;
     }
 
-    /** Only an actual JSON boolean counts, matching `value as? Bool` on iOS. */
-    private static Boolean bool(JSObject source, String key) {
+    /**
+     * Package-private, not private, for the same reason as {@link #theme}: the test
+     * can assert directly on it. This one is shared by five boolean fields with mixed
+     * SDK defaults ({@code skipExitPage}/{@code skipExitSuccessPage} default
+     * {@code false}; {@code showFooter}/{@code showMerchantLogo}/
+     * {@code showPaymentDetails} default {@code true}) -- a discarded/non-boolean
+     * value must come back as {@code null}, not a hardcoded {@code true} or
+     * {@code false} that would coincide with whichever of those five a test happens
+     * to exercise.
+     */
+    static Boolean bool(JSObject source, String key) {
         Object value = source.opt(key);
         return value instanceof Boolean ? (Boolean) value : null;
     }
