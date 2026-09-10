@@ -1,18 +1,20 @@
 #!/usr/bin/env node
 /**
- * Fails if the five surfaces that declare the options vocabulary stop matching.
+ * Fails if any of the six surfaces that carry this plugin's option and result
+ * vocabulary stop matching the contract in `src/definitions.ts`.
  *
  * The contract between JS and native is made of strings: `src/definitions.ts` declares
  * it, the Swift mapper and the Java mapper read it, and the harness offers it. Renaming
  * a key on just one surface leaves the flag with no effect **silently** — no test on
  * either side can detect the other one drifting.
  *
- * `src/web.ts` is the fifth surface, and the one drift is otherwise invisible on: no
- * test compares it to the contract, and nothing else reads it. Its options and colours
- * must partition into exactly two sets — read by the web layer, or declared in
- * `WEB_UNSUPPORTED`/`WEB_UNSUPPORTED_COLORS` — never both, never neither, so a new
- * contract key forces someone to decide what web does with it instead of letting it be
- * silently dropped.
+ * `src/web.ts` is a fourth surface for the options vocabulary, and the one drift is
+ * otherwise invisible on: no test compares it to the contract, and nothing else reads
+ * it. Its options and colours must partition into exactly two sets — read by the web
+ * layer, or declared in `WEB_UNSUPPORTED`/`WEB_UNSUPPORTED_COLORS` — never both, never
+ * neither, so a new contract key forces someone to decide what web does with it instead
+ * of letting it be silently dropped. The fifth and sixth surfaces are the result
+ * direction, below.
  *
  * It also covers the way back (native → JS), on both platforms: the 8 keys with which
  * `KhipuPlugin.swift` builds the promise via `call.resolve([...])`, and the 8 keys with
