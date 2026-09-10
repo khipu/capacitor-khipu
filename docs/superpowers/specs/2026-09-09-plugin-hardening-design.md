@@ -231,13 +231,32 @@ cannot check, because Android's result keys are not in our source to extract.
 things follow. The platforms stop diverging, and the keys become extractable — so the
 vocabulary guard can finally cover the return path on **both** platforms instead of one.
 
-**Left open on purpose:** which shape is canonical. The declared type is
-`exitUrl: string | undefined`; an absent key reads as `undefined` and satisfies it,
-while `null` does not. That points at "omit" as the canon, which would mean changing
-iOS — but what Capacitor's iOS bridge actually does with `nil as Any` has not been
-measured, and it may already omit the key. Until someone measures it on a device,
-Android keeps the shape it has today (absent), which is the one the published type
-promises. The measurement is recorded as a pending item in `docs/STATUS.md`.
+**Measured, and it settles which shape is canonical — but not in this pass.**
+`PluginCallResult.jsonRepresentation` passes the dictionary through
+`JSONSerialization.isValidJSONObject` and then serialises it. Run directly:
+
+```swift
+let exitUrl: String? = nil
+let dict: [String: Any] = ["exitUrl": exitUrl as Any, "result": "ERROR"]
+// isValidJSONObject: true
+// serialised: {"exitUrl":null,"result":"ERROR"}
+```
+
+So **iOS delivers `null`**, Android omits the key, and the two diverge — now on our side
+of the bridge rather than the SDKs'. And the published type is
+`exitUrl: string | undefined`, which `null` does not satisfy: iOS is the platform
+violating the contract this plugin ships.
+
+Omitting is the type-correct shape, so aligning means changing iOS, which changes what
+existing iOS merchants receive. That is a scope decision beyond this pass and it is
+**left to the user with the measurement in hand** rather than decided here. Recorded in
+`docs/STATUS.md`.
+
+Note the interaction the Android SDK team flagged: `IKW-1233` makes `asJson()` use
+`serializeNulls()`, so the SDK will start emitting these three keys as `null` to match
+iOS. Our reader omits nulls, so once that lands the merchant-visible result is
+unchanged and the divergence persists — by our choice, not the SDK's. That is a reason
+to decide, not a reason to change the reader silently.
 
 ## D. Web layer
 

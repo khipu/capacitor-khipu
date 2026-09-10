@@ -189,11 +189,16 @@ it.
 
 ## Known pending
 
-- **Measure what Capacitor's iOS bridge does with `nil as Any`.** `KhipuPlugin.swift`
-  resolves absent values that way. Android omits the key entirely. Until this is
-  measured on a device we do not know whether the two platforms already agree, so the
-  canonical shape of an absent result field is undecided. See section C5 of the
-  hardening spec.
+- **Decide the canonical shape of an absent result field.** Measured, no longer open:
+  Capacitor's iOS bridge serialises `nil as Any` to JSON `null`
+  (`PluginCallResult.jsonRepresentation` → `JSONSerialization`), so iOS delivers
+  `exitUrl`, `continueUrl` and `failureReason` as `null` while Android omits them. The
+  published type is `string | undefined`, which `null` does not satisfy, so iOS is the
+  side breaking the declared contract. Aligning on "omit" is type-correct but changes
+  what existing iOS merchants receive, so it needs a decision rather than a patch.
+  Android SDK ticket `IKW-1233` will make `asJson()` emit nulls to match iOS; since our
+  reader omits nulls, that will not change the merchant-visible result and the
+  divergence will persist by our choice.
 - **The AAR injects location permissions.** Its manifest declares `INTERNET`,
   `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION`, and the merger puts all three
   into every merchant app. Merchants publishing to Play must declare location use in
