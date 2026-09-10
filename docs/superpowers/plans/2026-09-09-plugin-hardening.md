@@ -2050,8 +2050,9 @@ and the launch is wrapped so a failure to start answers instead of stranding:
             call.reject("An operation is already in progress", "OPERATION_IN_PROGRESS");
             return;
         }
-        pending.clear();
 
+        // A stale pending call needs no explicit clearing: set() overwrites it, and
+        // isLive() above already decided it is not live.
         pending.set(call);
         try {
             startActivityForResult(call, getKhipuLauncherIntent(getContext(), operationId, options), "operationResult");
