@@ -86,6 +86,28 @@ Separately, if the iOS job's simulator destination ever becomes ambiguous: pin t
 runner's actual runtime version. `OS=latest` does not work — `xcodebuild` rejects it,
 confirmed when this was investigated.
 
+### Verifying a check, before trusting it
+
+Six checks in this project reported green while measuring nothing, in a single day of
+work across the four bridge repositories. Every one had the same shape: the method could
+not distinguish "I found nothing" from "there is nothing". A grep for accented characters
+that cannot see Spanish without diacritics. A SwiftLint step that exits 0 when the binary
+is absent. A count of exception tables that is identical with and without the fix it was
+looking for. A test double that satisfied both the correct and the broken mechanism. A
+guard pointed at a file the keys had moved out of, which would have matched an empty set
+against an empty set. And a `sed` that failed with the wrong flag syntax, printed its
+error, and left the next command's green output looking like an answer.
+
+Two habits catch these, and they catch different failures:
+
+- **A positive control** — search for something you know is present, mutate the thing the
+  check is supposed to notice — proves the instrument can see.
+- **Confirm the experiment happened** — `git diff` after applying a mutation, before
+  reading any result — proves there was something to see.
+
+The second is the one usually skipped, and it covers the worse case: a healthy
+instrument faithfully measuring an event that never occurred.
+
 ## Verified on device
 
 |                                  | Line 7 (CocoaPods)             | Line 8 (SPM)            |
