@@ -24,9 +24,16 @@ interface KwsSettings {
 }
 
 declare global {
-  interface Window {
-    Khipu?: new () => KwsWidget;
-  }
+  // kws.js declares `class Khipu` at the top level of a classic script. A top-level
+  // class creates a binding in the global LEXICAL environment, not a property of the
+  // global object, so `window.Khipu` is undefined no matter how well the script
+  // loaded. This must stay a bare identifier read. Do not "tidy" it into a window
+  // property: that was tried, and it makes every real call fail.
+  //
+  // `typeof Khipu` is the guard, not `Khipu === undefined`: `typeof` on a bare
+  // identifier never throws even when the binding does not exist at all yet (before
+  // the script has run), which is exactly the state this code checks it in.
+  const Khipu: (new () => KwsWidget) | undefined;
 }
 
 /**
@@ -75,31 +82,38 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
    * registered.
    */
   private widget(): Promise<KwsWidget> {
-    if (window.Khipu) {
-      return Promise.resolve(new window.Khipu());
+    const existing = KhipuWeb.instance();
+    if (existing) {
+      return Promise.resolve(existing);
     }
 
     this.loading ??= new Promise<KwsWidget>((resolve, reject) => {
-      const script = document.createElement('script');
       const timer = setTimeout(() => reject(new Error('timed out waiting for kws.js')), KhipuWeb.LOAD_TIMEOUT_MS);
 
-      script.addEventListener('load', () => {
+      const onSettled = () => {
         clearTimeout(timer);
-        if (window.Khipu) {
-          resolve(new window.Khipu());
+        const widget = KhipuWeb.instance();
+        if (widget) {
+          resolve(widget);
         } else {
           reject(new Error('kws.js loaded but never defined Khipu'));
         }
-      });
-      script.addEventListener('error', () => {
+      };
+      const onErrored = () => {
         clearTimeout(timer);
         reject(new Error('kws.js failed to load'));
-      });
+      };
 
-      script.id = KhipuWeb.SCRIPT_ID;
-      script.type = 'text/javascript';
-      script.src = KhipuWeb.SCRIPT_SRC;
-      document.head.appendChild(script);
+      // The id guard lives in the DOM, not on `this`, because it has to survive the
+      // page's own state and more than one `KhipuWeb` instance: never inject a second
+      // `<script id="kws_script_id">`. A script found here may already have fired its
+      // one and only `load` event — it will not fire again — but that is harmless:
+      // the caller already checked the global once, above, before falling back to
+      // this promise at all, and the timeout above still bounds the wait if this
+      // script settled without ever defining `Khipu`.
+      const script = (document.getElementById(KhipuWeb.SCRIPT_ID) as HTMLScriptElement | null) ?? this.injectScript();
+      script.addEventListener('load', onSettled);
+      script.addEventListener('error', onErrored);
     }).catch((error: unknown) => {
       // Do not cache a failure: a later call should be free to try again.
       this.loading = undefined;
@@ -107,6 +121,28 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
     });
 
     return this.loading;
+  }
+
+  /**
+   * A fresh `typeof Khipu !== 'undefined'` check, isolated in its own function on
+   * purpose: TypeScript treats an ambient `const` global as never reassigned, so an
+   * earlier `typeof Khipu !== 'undefined'` guard in the *same* function — the one in
+   * `widget()`, above — narrows `Khipu` to `undefined` for the rest of that function,
+   * closures included, even though the whole point of those closures is to observe
+   * `Khipu` change once kws.js finishes loading. A second, separately-scoped check is
+   * what actually re-reads the binding instead of trusting stale narrowing.
+   */
+  private static instance(): KwsWidget | undefined {
+    return typeof Khipu !== 'undefined' ? new Khipu() : undefined;
+  }
+
+  private injectScript(): HTMLScriptElement {
+    const script = document.createElement('script');
+    script.id = KhipuWeb.SCRIPT_ID;
+    script.type = 'text/javascript';
+    script.src = KhipuWeb.SCRIPT_SRC;
+    document.head.appendChild(script);
+    return script;
   }
 
   private run(widget: KwsWidget, call: StartOperationOptions): Promise<KhipuResult> {

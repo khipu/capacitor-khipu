@@ -162,4 +162,32 @@ describe('KhipuWeb', () => {
 
     await assertion;
   });
+
+  it('never injects a second script tag across separate instances', () => {
+    const first = new KhipuWeb().startOperation({ operationId: 'a', options: {} });
+    const second = new KhipuWeb().startOperation({ operationId: 'b', options: {} });
+
+    expect(document.querySelectorAll('#kws_script_id')).toHaveLength(1);
+
+    // Neither call is settled yet (no load/error dispatched, no timer advanced); avoid
+    // leaking them as unhandled rejections once this test's fake timers are torn down.
+    first.catch(() => undefined);
+    second.catch(() => undefined);
+  });
+
+  it('resolves every pending call once the one shared script settles', async () => {
+    const first = new KhipuWeb().startOperation({ operationId: 'a', options: {} });
+    const second = new KhipuWeb().startOperation({ operationId: 'b', options: {} });
+
+    expect(document.querySelectorAll('#kws_script_id')).toHaveLength(1);
+
+    // Simulates kws.js finishing its load: both instances share the one script tag,
+    // so both must have attached their own listeners to it rather than waiting on one
+    // that was never going to fire again.
+    fakeWidget(calls);
+    document.getElementById('kws_script_id')?.dispatchEvent(new Event('load'));
+
+    await expect(first).resolves.toEqual({ result: 'OK' });
+    await expect(second).resolves.toEqual({ result: 'OK' });
+  });
 });
