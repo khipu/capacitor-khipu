@@ -62,8 +62,8 @@ function commit() {
 
 /**
  * On web, `src/web.ts` receives the full payload but only implements `theme`,
- * `lightPrimary`/`darkPrimary`, `skipExitPage` and `skipExitSuccessPage`. This is
- * flagged above so it doesn't read as a broken plugin flag.
+ * `locale`, `lightPrimary`/`darkPrimary`, `skipExitPage` and `skipExitSuccessPage`.
+ * This is flagged above so it doesn't read as a broken plugin flag.
  */
 function platformNote() {
   if (Capacitor.getPlatform() !== 'web') {

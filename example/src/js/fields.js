@@ -26,7 +26,7 @@ export const OPTION_FIELDS = [
     type: 'text',
     label: 'locale',
     default: 'es_CL',
-    webSupported: false,
+    webSupported: true,
   },
   {
     key: 'theme',
