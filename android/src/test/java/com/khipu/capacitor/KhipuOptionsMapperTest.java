@@ -100,8 +100,7 @@ public class KhipuOptionsMapperTest {
         // by inheriting showFooter's already-tested wiring.
         KhipuOptions options = KhipuOptionsMapper.map(
             new JSObject(
-                "{\"skipExitPage\":true,\"skipExitSuccessPage\":true," +
-                "\"showMerchantLogo\":false,\"showPaymentDetails\":false}"
+                "{\"skipExitPage\":true,\"skipExitSuccessPage\":true," + "\"showMerchantLogo\":false,\"showPaymentDetails\":false}"
             )
         );
 
@@ -143,11 +142,11 @@ public class KhipuOptionsMapperTest {
         KhipuOptions options = KhipuOptionsMapper.map(
             new JSObject(
                 "{\"colors\":{\"lightBackground\":\"#111111\",\"lightOnBackground\":\"#222222\"," +
-                "\"lightPrimary\":\"#333333\",\"lightOnPrimary\":\"#444444\"," +
-                "\"lightTopBarContainer\":\"#555555\",\"lightOnTopBarContainer\":\"#666666\"," +
-                "\"darkBackground\":\"#777777\",\"darkOnBackground\":\"#888888\"," +
-                "\"darkPrimary\":\"#999999\",\"darkOnPrimary\":\"#AAAAAA\"," +
-                "\"darkTopBarContainer\":\"#BBBBBB\",\"darkOnTopBarContainer\":\"#CCCCCC\"}}"
+                    "\"lightPrimary\":\"#333333\",\"lightOnPrimary\":\"#444444\"," +
+                    "\"lightTopBarContainer\":\"#555555\",\"lightOnTopBarContainer\":\"#666666\"," +
+                    "\"darkBackground\":\"#777777\",\"darkOnBackground\":\"#888888\"," +
+                    "\"darkPrimary\":\"#999999\",\"darkOnPrimary\":\"#AAAAAA\"," +
+                    "\"darkTopBarContainer\":\"#BBBBBB\",\"darkOnTopBarContainer\":\"#CCCCCC\"}}"
             )
         );
 
@@ -168,9 +167,7 @@ public class KhipuOptionsMapperTest {
 
     @Test
     public void discardsMalformedColorValuesButStillBuildsColors() throws JSONException {
-        KhipuOptions options = KhipuOptionsMapper.map(
-            new JSObject("{\"colors\":{\"lightPrimary\":123,\"darkPrimary\":true}}")
-        );
+        KhipuOptions options = KhipuOptionsMapper.map(new JSObject("{\"colors\":{\"lightPrimary\":123,\"darkPrimary\":true}}"));
 
         assertNotNull(options.getColors());
         assertNull(options.getColors().getLightPrimary());

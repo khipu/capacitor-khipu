@@ -33,12 +33,33 @@ What landed:
 **Local verification for this branch is complete; CI has not run on it.** `npm run
 verify` passes end to end: 55 Vitest tests, the versions guard, the keys guard, the
 readme guard, `xcodebuild build`, `./gradlew clean build test` (24 JUnit tests, all
-passing), and `npm run build`. `npm run lint` currently **fails** at the `prettier
---check` stage on `android/src/test/java/com/khipu/capacitor/KhipuOptionsMapperTest.java`
-(introduced in `d1c8c5d`), which also means SwiftLint was never reached in that run; run
-standalone, `node-swiftlint` confirms the known failure mode documented in
-`.github/workflows/ci.yml` — it warns the binary is absent and exits 0 without linting a
-single line of Swift. Swift lint coverage for this branch currently comes from CI only.
+passing), and `npm run build`.
+
+`npm run lint` first **failed** at the `prettier --check` stage, on
+`android/src/test/java/com/khipu/capacitor/KhipuOptionsMapperTest.java`, formatting
+drift introduced in `d1c8c5d` (Task 8, round 4) that no later round of that task's
+review caught because none of them re-ran `npm run lint` after the file's last edit, and
+the pre-commit hook didn't catch it either. This was not cosmetic: CI's `web` job runs
+`npm run prettier -- --check` directly, so the branch could not have merged without it
+failing there. **Fixed** with `npm run prettier -- --write` on that one file — diff
+confirmed to be whitespace/line-wrapping only, no assertion, value, or ordering changed
+— and the 24 Android JUnit tests re-run clean afterward, `mapsTheTwelveColors` included.
+
+With that fixed, `npm run lint` now **passes end to end**, including reaching the
+SwiftLint stage for the first time in this pass — reaching it is not the same as it
+having checked anything. `node-swiftlint` prints, verbatim:
+
+```
+!!! WARN: SwiftLint not found in PATH. You can install it with Homebrew:
+
+    > brew install swiftlint
+```
+
+and exits 0 without linting a single line of Swift, because the binary is absent on
+this machine — the exact failure mode `.github/workflows/ci.yml` documents and guards
+against by checking for the binary separately in the `ios` job. **A green `npm run
+lint` on this machine is not evidence the Swift is clean** — nothing has reviewed it.
+Swift lint coverage for this branch comes from CI only.
 
 **The version to publish is `4.1.0`.** Publishing is not done here: `npm publish` needs
 a human with 2FA, and pushing the branch (or opening the PR, or merging) is the user's
