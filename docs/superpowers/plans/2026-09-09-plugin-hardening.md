@@ -156,13 +156,34 @@ one comment each. `example/src/index.html` — `Operación` → `Operation`,
 
 - [ ] **Step 7: Verify nothing Spanish is left in tracked source**
 
-Run:
+Two greps, because one is not enough. The first catches accented text:
+
 ```bash
 for f in $(git ls-files | grep -Ev '\.(png|jar|pbxproj|json|storyboard|plist|xml|md)$'); do
   grep -l '[áéíóúñÁÉÍÓÚÑ¿¡]' "$f" 2>/dev/null
 done
 ```
-Expected: no output. Markdown is excluded here because `docs/` is Task 2's job.
+
+The second catches Spanish **without** diacritics, which is where user-facing copy
+hides — preset labels, section headings, button text, `lang="es"`:
+
+```bash
+grep -rinE '\b(opciones|colores|resultado|resultados|todo|todos|ninguno|modo|oscuro|claro|marca|activado|desactivado|defecto|iniciar|guardar|limpiar|enviar|enviado|copiar|incluir|incluido|campo|campos|clave|claves|valor|valores|pago|operacion|operaciones)\b' \
+  --include='*.ts' --include='*.js' --include='*.mjs' --include='*.html' --include='*.swift' --include='*.java' --include='*.yml' \
+  src/ scripts/ ios/ android/ example/src/ .github/
+grep -rn 'lang="es"' example/
+```
+
+Expected: no output from the first; from the second, only English false positives
+(`todo` in an English comment, a proper noun). Adjudicate each hit — do not silence one
+by narrowing the pattern.
+
+**Do not skip the second grep.** The first one alone passed on a tree that still had
+`lang="es"`, three Spanish `<h2>` headings and four Spanish preset labels in it.
+
+Markdown is excluded because `docs/` is Task 2's job. Option and colour keys in
+`OPTION_FIELDS` and `COLOR_FIELDS` are protocol names, not copy: they stay, and
+`npm run verify:keys` will tell you if one was touched.
 
 - [ ] **Step 8: Run everything and commit**
 
