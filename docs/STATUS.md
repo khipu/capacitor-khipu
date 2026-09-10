@@ -211,3 +211,18 @@ it.
   between iOS and Android** on the same operation.
 - **Exercise `canOpenURL` on a physical device** with a bank app installed. The nine
   `LSApplicationQueriesSchemes` are still verified only as a declaration.
+- **`exitUrl` shipped mistyped in `2.11.2` and `2.11.3`** (`string` instead of
+  `string | undefined`). It stays that way **on purpose**: fixing it would break
+  compilation for merchants who already read the field without a guard, and that line
+  is frozen. Both maintained lines have had the correct type since `48aabf7`. Without
+  this reason on record, someone "fixes" it in a year and breaks merchants in
+  production.
+- **The `@typescript-eslint` warning** about parsing TypeScript 5.9.3 outside its
+  officially supported range (`<5.2.0`). Accepted on purpose: it is exactly the stack
+  the official Capacitor 8 plugins run on — `@ionic/eslint-config@0.4.0` is the latest
+  release and pins `^5.58` — and stepping off it means maintaining a custom eslint
+  config. Without the reason on record, someone reopens this from scratch.
+- **A latent `merge()` bug in `example/src/js/storage.js`**: the `colors` guard
+  operates on the whole object, so a `stored.colors = {}` would overwrite
+  `colors.include` with `false`. Latent, no impact under real-world use, and it only
+  affects the harness. A known defect nobody has fixed yet, and those get recorded.
