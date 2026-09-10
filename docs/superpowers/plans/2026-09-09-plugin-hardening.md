@@ -805,6 +805,16 @@ describe('KhipuWeb', () => {
     delete (window as any).matchMedia;
   });
 
+  it('follows the system when no theme was sent, as both native SDKs do', async () => {
+    fakeWidget(calls);
+    (window as any).matchMedia = () => ({ matches: true });
+
+    await new KhipuWeb().startOperation({ operationId: 'abc', options: {} });
+
+    expect(calls[0].settings.options.style.theme).toBe('dark');
+    delete (window as any).matchMedia;
+  });
+
   it('defaults both skip flags to false', async () => {
     fakeWidget(calls);
 
@@ -1004,14 +1014,22 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
     });
   }
 
+  /**
+   * Resolves to what kws.js understands, which is only light or dark.
+   *
+   * An absent theme follows the system rather than falling back to light. Both native
+   * SDKs default to SYSTEM (`KhipuOptions.kt:37`, `KhipuOptions.swift:68`), so web
+   * quietly choosing light meant the same payment rendered light on web and dark on the
+   * phone, with nothing in the merchant's code to explain it.
+   */
   private static theme(theme: KhipuOptions['theme']): 'light' | 'dark' {
     if (theme === 'dark') {
       return 'dark';
     }
-    if (theme === 'system') {
-      return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (theme === 'light') {
+      return 'light';
     }
-    return 'light';
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
 
   private mountElement(): HTMLElement {
@@ -1033,13 +1051,23 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
 Run: `npx vitest run src/web.test.ts`
 Expected: PASS, 13 tests.
 
-- [ ] **Step 5: Run everything and commit**
+- [ ] **Step 5: Document the theme default on the contract**
+
+Task 4 documented `theme` without this, because the divergence was found afterwards.
+Add to `theme`'s JSDoc in `src/definitions.ts` that leaving it out follows the device's
+setting on all three platforms — and say it plainly, because until this task web did
+something else.
+
+Then `npm run build` to regenerate the README section, and confirm
+`npm run verify:readme` and `npm run verify:keys` still pass.
+
+- [ ] **Step 6: Run everything and commit**
 
 Run: `npm test && npm run lint && npm run verify:web`
 Expected: PASS.
 
 ```bash
-git add src/web.ts src/web.test.ts
+git add src/web.ts src/web.test.ts src/definitions.ts README.md
 git commit -m "fix: send locale on web, load kws.js on demand, and never hang"
 ```
 
