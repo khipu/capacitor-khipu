@@ -1600,7 +1600,34 @@ In `KhipuPlugin.java`, delete the nineteen inline `if (options.has(...))` blocks
 `KhipuOptionsMapper.map(call.getObject("options", new JSObject()))`. Leave the rest of
 `startOperation` alone for now; Task 10 restructures it.
 
-- [ ] **Step 7: Delete the template stub**
+- [ ] **Step 7: Move the vocabulary guard onto the mapper**
+
+Extracting the mapper moves the option keys out of `KhipuPlugin.java`, and
+`scripts/check-option-keys.mjs` reads that file. Leaving it pointed at the old path
+does not make the guard lax — it makes it read **zero** keys, which is the failure its
+own sanity floor exists to catch. Do it in this task, not later: otherwise
+`verify:keys` is red between tasks.
+
+In `scripts/check-option-keys.mjs`:
+
+- Rename the `JAVA` constant to `MAPPER` and point it at
+  `android/src/main/java/com/khipu/capacitor/KhipuOptionsMapper.java`.
+- Options pattern: `/\b(?:string|bool)\(options, "(\w+)"/g`.
+- Colours pattern: `/\bstring\(colors, "(\w+)"/g`.
+- Keep `withoutColors` on the options surface. The container is read with
+  `getJSObject("colors")` so it does not match today, but the filter costs nothing and
+  survives someone switching it to a helper.
+- The top comment says the Java **plugin** reads the contract. It is the mapper now.
+- The test fixture writes a `KhipuPlugin.java` with `object.has("key")` shapes. It must
+  write a `KhipuOptionsMapper.java` with the new shapes, or the test validates a
+  pattern that no longer exists anywhere.
+
+Then prove the guard can still fail on this surface: rename a key in the mapper
+(`"showFooter"` to `"showFooterX"`), run `npm run verify:keys`, confirm it fails naming
+both keys, and revert. A pattern that silently matches nothing turns this guard into
+decoration.
+
+- [ ] **Step 8: Delete the template stub**
 
 ```bash
 git rm android/src/test/java/com/getcapacitor/ExampleUnitTest.java
@@ -1608,13 +1635,13 @@ git rm android/src/test/java/com/getcapacitor/ExampleUnitTest.java
 
 It asserts `4 == 2 + 2`.
 
-- [ ] **Step 8: Build and commit**
+- [ ] **Step 9: Build and commit**
 
-Run: `cd android && ./gradlew clean build test && cd ..`
-Expected: PASS.
+Run: `cd android && ./gradlew clean build test && cd ..` and `npm test && npm run verify:keys`
+Expected: PASS, both.
 
 ```bash
-git add android/
+git add android/ scripts/
 git commit -m "fix: skip malformed option values on Android instead of crashing"
 ```
 
@@ -2058,8 +2085,11 @@ was verified by hand; it does not have to be any more.
 - Modify: `scripts/check-option-keys.mjs`, `scripts/check-option-keys.test.mjs`
 
 **Interfaces:**
-- Consumes: the `result.put("<key>", ...)` calls in `KhipuResultReader.java`.
+- Consumes: the `put(result, "<key>", ...)` calls in `KhipuResultReader.java`.
 - Produces: a sixth surface checked against `KhipuResult`.
+- Note: Task 8 already renamed the Java options surface constant to `MAPPER` and
+  repointed it at `KhipuOptionsMapper.java`. You are adding a new constant beside it,
+  not repurposing that one.
 
 - [ ] **Step 1: Write the failing test**
 
