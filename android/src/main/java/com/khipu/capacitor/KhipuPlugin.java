@@ -43,11 +43,16 @@ public class KhipuPlugin extends Plugin {
             return;
         }
 
+        // Rejected, not superseded: the first operation's activity is still on screen
+        // and will still deliver a result to it. Superseding it here - clearing
+        // `pending` and letting this second call take over - would discard that
+        // result, and it may be a payment that actually went through. PendingCall
+        // documents the liveness half of this design; this is the half that explains
+        // why refusing, rather than replacing, is the only safe choice.
         if (pending.isLive(getBridge())) {
             call.reject("An operation is already in progress", "OPERATION_IN_PROGRESS");
             return;
         }
-        pending.clear();
 
         pending.set(call);
         try {
