@@ -147,6 +147,18 @@ unless you send `locale` explicitly.
 
 `result.exitUrl` can come back empty on real payments, so check it before using it.
 
+## Behaviour changes in 4.1.0
+
+- **A second, concurrent `startOperation` call is now rejected instead of hanging
+  forever.** If your app could call it twice before the first call resolves, add
+  handling for the rejection. The error carries a code only on Android
+  (`'INVALID_OPTIONS'`, `'OPERATION_IN_PROGRESS'`, `'LAUNCH_FAILED'`, `'NO_RESULT'`);
+  iOS and web reject without one, so don't branch on `error.code` cross-platform.
+- **An absent `theme` on web now follows the device's own setting**, matching iOS and
+  Android, instead of always falling back to light. If your web users are on a device
+  set to dark mode and you did not send `theme` explicitly, the payment screen now
+  renders differently than it did before.
+
 ## API
 
 <docgen-index>
@@ -175,6 +187,15 @@ A user who abandons the payment still resolves this promise: it comes back as
 `result: 'OK'`, `'ERROR'`, `'WARNING'` or `'CONTINUE'` in every case. See
 `KhipuResult.result` for what abandonment looks like.
 
+Calling this a second time while an operation is already in flight rejects the
+second call instead of hanging or replacing the first one — the first operation's
+screen is still on screen and will still deliver a result to it, which could be a
+payment that went through. The rejection carries an error code only on Android
+(`'INVALID_OPTIONS'`, `'OPERATION_IN_PROGRESS'`, `'LAUNCH_FAILED'` or
+`'NO_RESULT'`, from `KhipuPlugin.java`); iOS rejects with no code, and web rejects
+a bare `Error`. Do not write `e.code === 'OPERATION_IN_PROGRESS'` and expect it to
+work on every platform.
+
 | Param         | Type                                                                    |
 | ------------- | ----------------------------------------------------------------------- |
 | **`options`** | <code><a href="#startoperationoptions">StartOperationOptions</a></code> |
@@ -189,16 +210,16 @@ A user who abandons the payment still resolves this promise: it comes back as
 
 #### KhipuResult
 
-| Prop                | Type                                                    | Description                                                                                                                                                                                                                                                                 |
-| ------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`operationId`**   | <code>string</code>                                     | The operation id that was passed to `startOperation`.                                                                                                                                                                                                                       |
-| **`exitTitle`**     | <code>string</code>                                     | Title of the closing screen the SDK already showed the payer (success, failure, warning, or continue). Confirmed on iOS, Android and web: all three set it from the same title the SDK's own screen displayed. Reuse it if you render your own screen instead of the SDK's. |
-| **`exitMessage`**   | <code>string</code>                                     | Body text of the closing screen the SDK already showed the payer, paired with `exitTitle`. Confirmed on iOS, Android and web. Reuse it if you render your own screen instead of the SDK's.                                                                                  |
-| **`exitUrl`**       | <code>string</code>                                     | URL associated with the exit screen. Can come back empty on real payments, so check it before using it.                                                                                                                                                                     |
-| **`result`**        | <code>'OK' \| 'ERROR' \| 'WARNING' \| 'CONTINUE'</code> | Outcome of the operation. A user who abandons the payment arrives here as `'ERROR'` with `failureReason: 'USER_CANCELED'` — not as a rejected promise.                                                                                                                      |
-| **`failureReason`** | <code>string</code>                                     | Machine-readable reason behind the current `result`, straight from the Khipu protocol. Treat it as an open-ended string, not a fixed list: the protocol adds values over time — `USER_DISCONNECTED` is a recent one — and a hardcoded list here would go stale silently.    |
-| **`continueUrl`**   | <code>string</code>                                     | URL to send the payer to so they can finish the operation. Present when, and only when, `result` is `'CONTINUE'` — confirmed on iOS, Android and web, where every other outcome branch leaves it `undefined`/`nil`. Undefined for every other `result` value.               |
-| **`events`**        | <code>KhipuEvent[]</code>                               | Events recorded during the operation, in the order the SDK reported them.                                                                                                                                                                                                   |
+| Prop                | Type                                                    | Description                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`operationId`**   | <code>string</code>                                     | The operation id that was passed to `startOperation`.                                                                                                                                                                                                                                                                                                                                                                                 |
+| **`exitTitle`**     | <code>string</code>                                     | Title of the closing screen the SDK already showed the payer (success, failure, warning, or continue). Confirmed on iOS, Android and web: all three set it from the same title the SDK's own screen displayed. Reuse it if you render your own screen instead of the SDK's.                                                                                                                                                           |
+| **`exitMessage`**   | <code>string</code>                                     | Body text of the closing screen the SDK already showed the payer, paired with `exitTitle`. Confirmed on iOS, Android and web. Reuse it if you render your own screen instead of the SDK's.                                                                                                                                                                                                                                            |
+| **`exitUrl`**       | <code>string</code>                                     | URL associated with the exit screen. Can come back empty on real payments, so check it before using it. When absent, iOS sends it as JSON `null` while Android omits the key entirely — both are valid under how each platform's bridge serialises a nil/absent optional, and neither is going to change (see `docs/STATUS.md`, "Known pending"). Compare with truthiness or `??`, not `=== undefined`, so it reads the same on both. |
+| **`result`**        | <code>'OK' \| 'ERROR' \| 'WARNING' \| 'CONTINUE'</code> | Outcome of the operation. A user who abandons the payment arrives here as `'ERROR'` with `failureReason: 'USER_CANCELED'` — not as a rejected promise.                                                                                                                                                                                                                                                                                |
+| **`failureReason`** | <code>string</code>                                     | Machine-readable reason behind the current `result`, straight from the Khipu protocol. Treat it as an open-ended string, not a fixed list: the protocol adds values over time — `USER_DISCONNECTED` is a recent one — and a hardcoded list here would go stale silently. When absent, iOS sends it as JSON `null` while Android omits the key entirely. Compare with truthiness or `??`, not `=== undefined`.                         |
+| **`continueUrl`**   | <code>string</code>                                     | URL to send the payer to so they can finish the operation. Present when, and only when, `result` is `'CONTINUE'` — confirmed on iOS, Android and web, where every other outcome branch leaves it `undefined`/`nil`. Undefined for every other `result` value. When absent, iOS sends it as JSON `null` while Android omits the key entirely. Compare with truthiness or `??`, not `=== undefined`.                                    |
+| **`events`**        | <code>KhipuEvent[]</code>                               | Events recorded during the operation, in the order the SDK reported them.                                                                                                                                                                                                                                                                                                                                                             |
 
 
 #### KhipuEvent

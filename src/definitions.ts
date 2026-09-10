@@ -10,6 +10,15 @@ export interface KhipuPlugin {
    * A user who abandons the payment still resolves this promise: it comes back as
    * `result: 'OK'`, `'ERROR'`, `'WARNING'` or `'CONTINUE'` in every case. See
    * `KhipuResult.result` for what abandonment looks like.
+   *
+   * Calling this a second time while an operation is already in flight rejects the
+   * second call instead of hanging or replacing the first one — the first operation's
+   * screen is still on screen and will still deliver a result to it, which could be a
+   * payment that went through. The rejection carries an error code only on Android
+   * (`'INVALID_OPTIONS'`, `'OPERATION_IN_PROGRESS'`, `'LAUNCH_FAILED'` or
+   * `'NO_RESULT'`, from `KhipuPlugin.java`); iOS rejects with no code, and web rejects
+   * a bare `Error`. Do not write `e.code === 'OPERATION_IN_PROGRESS'` and expect it to
+   * work on every platform.
    */
   startOperation(options: StartOperationOptions): Promise<KhipuResult>;
 }
@@ -25,9 +34,20 @@ export interface StartOperationOptions {
    *
    * The whole object can be left out too; that is equivalent to sending an empty one.
    */
+  // `| undefined` alongside `?` here too, same reason as every field of `KhipuOptions`
+  // below: without it, `exactOptionalPropertyTypes` rejects `options: undefined` sent
+  // explicitly, rather than omitted.
   options?: KhipuOptions | undefined;
 }
 
+// Every field below is typed `field?: T | undefined`, not just `field?: T`. The union
+// looks redundant — `?` already makes the key optional — but it is not: dropping it
+// changes what compiles under `exactOptionalPropertyTypes` (which `verify:readme`
+// turns on for the README's own examples). With only `?`, that flag rejects a key
+// that is *present* with the value `undefined` — it must be omitted entirely. A
+// merchant building this object conditionally, e.g.
+// `{ locale: useSpanish ? 'es_CL' : undefined }`, needs the key to be allowed to hold
+// `undefined` explicitly. Keep the union, on every field, so that keeps compiling.
 /**
  * Presentation options for the payment screen. Every field is optional, and an absent
  * field is not the same as sending one: leaving a key out lets the platform apply its
@@ -219,8 +239,17 @@ export interface KhipuResult {
   /**
    * URL associated with the exit screen. Can come back empty on real payments, so
    * check it before using it.
+   *
+   * When absent, iOS sends it as JSON `null` while Android omits the key entirely —
+   * both are valid under how each platform's bridge serialises a nil/absent optional,
+   * and neither is going to change (see `docs/STATUS.md`, "Known pending"). Compare
+   * with truthiness or `??`, not `=== undefined`, so it reads the same on both.
    */
   exitUrl: string | undefined;
+  // Never add 'CANCELED' (or any other value) to this union without a major version
+  // bump. Merchants switch on `result` exhaustively, so a new member breaks their
+  // compile the moment they upgrade even a minor release. A user who cancels is
+  // folded into 'ERROR' below for exactly this reason: it needs no new member.
   /**
    * Outcome of the operation. A user who abandons the payment arrives here as
    * `'ERROR'` with `failureReason: 'USER_CANCELED'` — not as a rejected promise.
@@ -231,6 +260,9 @@ export interface KhipuResult {
    * protocol. Treat it as an open-ended string, not a fixed list: the protocol adds
    * values over time — `USER_DISCONNECTED` is a recent one — and a hardcoded list
    * here would go stale silently.
+   *
+   * When absent, iOS sends it as JSON `null` while Android omits the key entirely.
+   * Compare with truthiness or `??`, not `=== undefined`.
    */
   failureReason: string | undefined;
   /**
@@ -238,6 +270,9 @@ export interface KhipuResult {
    * only when, `result` is `'CONTINUE'` — confirmed on iOS, Android and web, where
    * every other outcome branch leaves it `undefined`/`nil`. Undefined for every
    * other `result` value.
+   *
+   * When absent, iOS sends it as JSON `null` while Android omits the key entirely.
+   * Compare with truthiness or `??`, not `=== undefined`.
    */
   continueUrl: string | undefined;
   /**
