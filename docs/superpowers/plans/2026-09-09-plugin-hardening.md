@@ -571,7 +571,42 @@ git commit -m "fix: make every option optional, and hold the README to the compi
 - Consumes: the optional fields from Task 3.
 - Produces: a `<docgen-api>` section carrying the field documentation.
 
-- [ ] **Step 1: Add JSDoc to every declaration**
+- [ ] **Step 1: Make the `options` object itself optional**
+
+This is a type change, not documentation, so it comes first and on its own. Task 3 made
+every key inside `KhipuOptions` optional but left the container required, so a merchant
+who wants defaults everywhere still has to write `options: {}`.
+
+```ts
+export interface StartOperationOptions {
+  operationId: string;
+  options?: KhipuOptions | undefined;
+}
+```
+
+Safe on all three platforms, verified: Android reads it as
+`call.getObject("options", new JSObject())`, iOS passes a nil `JSObject?` into a mapper
+whose first statement is `guard let options else { return draft }`, and the web layer
+reads `call.options ?? {}`. It is a widening, so nothing that compiles today stops.
+
+Then add a second example to the README's Usage section, above the existing one, so the
+guard from Task 3 proves this rather than us asserting it:
+
+````markdown
+The only thing you have to pass is the operation id:
+
+```typescript
+import { Khipu } from 'capacitor-khipu';
+
+const result = await Khipu.startOperation({ operationId: '<the operation id>' });
+```
+````
+
+Run `npm run verify:readme` after adding it. If the guard passes before you change
+`StartOperationOptions`, the guard is not seeing the new block — find out why before
+continuing.
+
+- [ ] **Step 2: Add JSDoc to every declaration**
 
 Write one JSDoc per field. Cover, at minimum:
 
@@ -628,17 +663,17 @@ Document `title`, `titleImageUrl`, `theme`, `colors`, `showFooter`,
 `showMerchantLogo`, `showPaymentDetails`, `skipExitPage`, every field of `KhipuResult`
 and `KhipuEvent`, and name on each of the web-unsupported options that web ignores it.
 
-- [ ] **Step 2: Regenerate**
+- [ ] **Step 3: Regenerate**
 
 Run: `npm run build`
 Expected: the `<docgen-api>` block in `README.md` now shows a Description column.
 
-- [ ] **Step 3: Confirm the guards still pass**
+- [ ] **Step 4: Confirm the guards still pass**
 
 Run: `npm test && npm run verify:readme && npm run verify:keys`
 Expected: PASS. The README guard must still ignore the regenerated docgen section.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/definitions.ts README.md
