@@ -252,9 +252,13 @@ existing iOS merchants receive. That is a scope decision beyond this pass and it
 **left to the user with the measurement in hand** rather than decided here. Recorded in
 `docs/STATUS.md`.
 
-Note the interaction the Android SDK team flagged: `IKW-1233` makes `asJson()` use
-`serializeNulls()`, so the SDK will start emitting these three keys as `null`. Our
-reader omits nulls, so once that lands the merchant-visible result is unchanged.
+**`IKW-1233` does not bear on this decision at all**, which is worth stating because it
+looks as though it should. That ticket makes `asJson()` use `serializeNulls()`, and
+section C5 stopped calling `asJson()` — the reader reads the getters, and
+`getExitUrl()` returns Kotlin's `String?`, null either way. Verified: no call to
+`asJson()` remains in this repository. So the decision below is available now and does
+not wait on an unreleased SDK version. Anyone deferring it on those grounds is deferring
+for no reason.
 
 That is not us perpetuating a divergence out of inertia, and the distinction is worth
 stating because it changes what the right fix is. The two layers have different
