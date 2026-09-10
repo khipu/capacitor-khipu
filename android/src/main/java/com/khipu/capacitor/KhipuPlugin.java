@@ -18,20 +18,49 @@ import java.io.Serializable;
 @CapacitorPlugin(name = "Khipu")
 public class KhipuPlugin extends Plugin {
 
+    private final PendingCall pending = new PendingCall();
+
     @PluginMethod
     public void startOperation(PluginCall call) {
         String operationId = call.getString("operationId");
         if (operationId == null) {
-            call.reject("Must provide operationId");
+            call.reject("Must provide operationId", "INVALID_OPTIONS");
             return;
         }
-        KhipuOptions options = KhipuOptionsMapper.map(call.getObject("options", new JSObject()));
-        startActivityForResult(call, getKhipuLauncherIntent(getContext(), operationId, options), "operationResult");
+
+        KhipuOptions options;
+        try {
+            // Backstop: Task 8 proved this mapper cannot throw on any merchant input
+            // against the current SDK version, but it calls a third-party Kotlin
+            // builder we do not control across versions. If it ever does throw here,
+            // uncaught, Capacitor rethrows it as a RuntimeException on the task
+            // handler and the promise never settles - the app very likely dies. This
+            // catch is cheap insurance against that, kept even though it is
+            // unreachable today.
+            options = KhipuOptionsMapper.map(call.getObject("options", new JSObject()));
+        } catch (RuntimeException e) {
+            call.reject("Could not read the options object", "INVALID_OPTIONS", e);
+            return;
+        }
+
+        if (pending.isLive(getBridge())) {
+            call.reject("An operation is already in progress", "OPERATION_IN_PROGRESS");
+            return;
+        }
+        pending.clear();
+
+        pending.set(call);
+        try {
+            startActivityForResult(call, getKhipuLauncherIntent(getContext(), operationId, options), "operationResult");
+        } catch (RuntimeException e) {
+            pending.clear();
+            call.reject("Could not launch the Khipu activity", "LAUNCH_FAILED", e);
+        }
     }
 
     @ActivityCallback
     private void operationResult(PluginCall call, ActivityResult result) {
-        // TODO(Task 10): pending.clear() belongs here once `pending` is introduced.
+        pending.clear();
         if (call == null) {
             return;
         }
