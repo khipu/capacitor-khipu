@@ -2062,7 +2062,18 @@ and the launch is wrapped so a failure to start answers instead of stranding:
     }
 ```
 
-Add `pending.clear();` as the first line of `operationResult`, as Task 9 noted.
+Add `pending.clear();` as the first line of `operationResult`, and **delete the
+`TODO(Task 10)` marker Task 9 left there**. A marker that outlives the task it names is
+how comments start lying.
+
+Keep the `try`/`catch` around the mapping call even though Task 8 proved the mapper
+cannot throw on any merchant input. That proof holds for this mapper against this SDK
+version; the mapper calls a third-party Kotlin builder we do not control across
+versions, and if it ever does throw, the result is not a caught error — Capacitor
+rethrows it as a `RuntimeException` on the task handler, the promise never settles and
+the app very likely dies. Three lines against that is proportionate. It cannot be
+covered by a test without injecting a throwing mapper, which is a production change for
+a test, so give it a comment saying it is a deliberate backstop and why.
 
 - [ ] **Step 6: Build and commit**
 
