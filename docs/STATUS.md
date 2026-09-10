@@ -68,6 +68,24 @@ All three lines are published to npm, as of 2026-09-05, with these dist-tags:
   Both guards have tests for their failure path, not only their success path.
 - **CI on GitHub Actions**, the repository's first, running on `main` and `7.x`.
 
+## CI operational notes
+
+CI's first run, on 2026-09-05, failed on **both** maintained lines from the same cause:
+`package.json` and `package-lock.json` were out of sync for the runner's npm. The lock
+had been generated with npm 11.16 under Node 26, and CI runs Node 22, whose npm resolves
+a different dependency tree; `npm ci` is strict about that mismatch and fails, while a
+local `npm install` doesn't notice it.
+
+**Rule: regenerate any lockfile in this repo with
+`~/.nvm/versions/node/v22.23.2/bin/npm install`, not Homebrew's Node.** And do it per
+line, not once — the fix is **not cherry-pickable** between lines: `main` and `7.x`
+have different dependency trees, so each branch that touches its lockfile needs its own
+regeneration with the Node 22 npm.
+
+Separately, if the iOS job's simulator destination ever becomes ambiguous: pin the
+runner's actual runtime version. `OS=latest` does not work — `xcodebuild` rejects it,
+confirmed when this was investigated.
+
 ## Verified on device
 
 |                                  | Line 7 (CocoaPods)             | Line 8 (SPM)            |
