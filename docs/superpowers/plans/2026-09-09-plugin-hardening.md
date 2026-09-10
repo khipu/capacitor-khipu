@@ -232,12 +232,31 @@ Add a **Known pending** section carrying these items forward:
   into every merchant app. Merchants publishing to Play must declare location use in
   their data safety form. Documenting it in the README was considered and deliberately
   left out of the hardening pass; it wants a channel to the Android SDK team.
-- **An unknown `FailureReasonType` crashes the whole process.** Reported by the React
-  Native bridge session: on a failure event the SDK throws
+- **An unknown enum value from the protocol can crash the whole process** — tracked as
+  [IKW-1232](https://khipucom.atlassian.net/browse/IKW-1232), the single ticket all four
+  bridge repositories reference. On a failure event the SDK threw
   `JsonMappingException: Cannot deserialize FailureReasonType` inside
-  `com.khipu.khenshin.protocol.Converter`, on socket.io's `EventThread`, uncaught. The
-  process dies, so no bridge can resolve or reject anything. Reproduced once by them,
-  not by us, and not known to be fixed by the `2.28.0` bump.
+  `com.khipu.khenshin.protocol.Converter`, on socket.io's `EventThread`, uncaught: the
+  process died, and a dead process cannot resolve or reject anything.
+
+  Status, in three parts, because they resolve at different speeds:
+  - *The value that was hit* is covered. Protocol `1.0.60` adds `USER_DISCONNECTED` and
+    `forValue` recognises it.
+  - *The mechanism* is fixed under IKW-1232, which wraps the SDK's 23 socket listeners
+    so a throwing handler never reaches the event thread. Expected as a patch release
+    after `2.28.0`. Two consequences reach us and both are already handled: a terminal
+    message that fails to parse ends the operation with no `failureReason` (our result
+    reader omits null keys, and a test asserts it), and a non-terminal failure leaves
+    the operation genuinely in flight with the payer's only exit being to cancel.
+  - *The deserialisation itself* is not hardened. Verified against protocol `1.0.60`:
+    `forValue` declares `throws IOException`, there is `@JsonValue` and `@JsonCreator`
+    but no `@JsonEnumDefaultValue`, the converter configures only
+    `FAIL_ON_UNKNOWN_PROPERTIES`, and it is 8 of 8 enums with that pattern. Making
+    unknown values degrade instead of throwing is a proposal in the ticket, in another
+    repository, neither decided nor prioritised. **Assume it never arrives.**
+
+  A bridge reading only the middle bullet may conclude it needs its own timeout. It does
+  not: a timeout over a payment operation that is still alive is worse than the problem.
 - **Verify dark mode colour mapping on Android**, and **compare `KhipuResult` fields
   between iOS and Android** on the same operation.
 - **Exercise `canOpenURL` on a physical device** with a bank app installed. The nine
