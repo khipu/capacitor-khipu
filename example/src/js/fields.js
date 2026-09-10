@@ -91,13 +91,13 @@ export const COLOR_FIELDS = [
 export const PRESETS = [
   {
     id: 'defaults',
-    label: 'Todo por defecto',
+    label: 'All defaults',
     optionKeys: [],
     colorKeys: null,
   },
   {
     id: 'khipu',
-    label: 'Marca Khipu',
+    label: 'Khipu brand',
     optionKeys: ['title', 'theme'],
     colorKeys: [
       'lightPrimary',
@@ -110,13 +110,13 @@ export const PRESETS = [
   },
   {
     id: 'all',
-    label: 'Todo activado',
+    label: 'All enabled',
     optionKeys: OPTION_FIELDS.map((field) => field.key),
     colorKeys: COLOR_FIELDS.map((field) => field.key),
   },
   {
     id: 'dark',
-    label: 'Modo oscuro',
+    label: 'Dark mode',
     optionKeys: ['theme'],
     colorKeys: [
       'darkBackground',

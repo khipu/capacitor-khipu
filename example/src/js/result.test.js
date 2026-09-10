@@ -12,14 +12,14 @@ describe('renderResult', () => {
   it('shows the result fields', () => {
     renderResult(container, {
       operationId: 'abc123',
-      exitTitle: 'Listo',
-      exitMessage: 'Pago realizado',
+      exitTitle: 'Done',
+      exitMessage: 'Payment completed',
       result: 'OK',
       events: [],
     });
 
     expect(container.textContent).toContain('abc123');
-    expect(container.textContent).toContain('Pago realizado');
+    expect(container.textContent).toContain('Payment completed');
     expect(container.querySelector('.result-OK')).not.toBeNull();
   });
 

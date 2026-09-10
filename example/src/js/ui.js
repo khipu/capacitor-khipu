@@ -21,8 +21,8 @@ function row(field, entry, onChange) {
   if (!field.webSupported) {
     const badge = document.createElement('span');
     badge.className = 'badge';
-    badge.title = 'src/web.ts ignora este campo; solo tiene efecto en iOS y Android';
-    badge.textContent = 'sin web';
+    badge.title = 'src/web.ts ignores this field; it only has an effect on iOS and Android';
+    badge.textContent = 'no web';
     label.appendChild(badge);
   }
 

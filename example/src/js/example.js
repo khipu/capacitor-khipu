@@ -67,14 +67,14 @@ function commit() {
  */
 function platformNote() {
   if (Capacitor.getPlatform() !== 'web') {
-    return `Plataforma ${Capacitor.getPlatform()}: todos los campos tienen efecto.`;
+    return `Platform ${Capacitor.getPlatform()}: every field has an effect.`;
   }
 
   const ignored = [...OPTION_FIELDS, ...COLOR_FIELDS].filter((entry) => !entry.webSupported).map((entry) => entry.key);
 
-  return `Plataforma web: el fallback de src/web.ts ignora ${
+  return `Platform web: the src/web.ts fallback ignores ${
     ignored.length
-  } campos (${ignored.join(', ')}). Prueba en iOS o Android para ejercitarlos.`;
+  } fields (${ignored.join(', ')}). Try iOS or Android to exercise them.`;
 }
 
 dom.platformNote.textContent = platformNote();
