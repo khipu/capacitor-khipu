@@ -87,10 +87,40 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
       return Promise.resolve(existing);
     }
 
-    this.loading ??= new Promise<KwsWidget>((resolve, reject) => {
+    this.loading ??= this.load();
+    return this.loading;
+  }
+
+  /**
+   * The id guard lives in the DOM, not on `this`, because it has to survive the
+   * page's own state and more than one `KhipuWeb` instance: never inject a second
+   * `<script id="kws_script_id">`. A script found here may already have fired its
+   * one and only `load` event — it will not fire again — but that is harmless: the
+   * caller already checked the global once, in `widget()`, before falling back to
+   * this promise at all.
+   *
+   * The lookup happens here, outside the `Promise` executor below, so this method's
+   * own scope — shared by the executor and the trailing `.catch` — knows both which
+   * script it ended up with and whether *this call* is the one that injected it.
+   * That distinction matters on failure: a script that loaded and settled without
+   * ever defining `Khipu` (a captive portal, an error page served as 200) is dead
+   * and will not fire `load`/`error` again, but it stays in the DOM unless removed.
+   * Left there, the next call finds it via the same id guard, attaches to an event
+   * that will never come, and waits out the full timeout to report the wrong
+   * diagnosis (a "timeout" when the real story is "loaded garbage"). Only the call
+   * that injected the element removes it on failure — one that merely attached to
+   * an existing, still-loading script leaves it alone, since another `KhipuWeb`
+   * instance may still be waiting on that same script to settle.
+   */
+  private load(): Promise<KwsWidget> {
+    const preexisting = document.getElementById(KhipuWeb.SCRIPT_ID) as HTMLScriptElement | null;
+    const script = preexisting ?? this.injectScript();
+    const injectedHere = preexisting === null;
+
+    return new Promise<KwsWidget>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('timed out waiting for kws.js')), KhipuWeb.LOAD_TIMEOUT_MS);
 
-      const onSettled = () => {
+      script.addEventListener('load', () => {
         clearTimeout(timer);
         const widget = KhipuWeb.instance();
         if (widget) {
@@ -98,29 +128,19 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
         } else {
           reject(new Error('kws.js loaded but never defined Khipu'));
         }
-      };
-      const onErrored = () => {
+      });
+      script.addEventListener('error', () => {
         clearTimeout(timer);
         reject(new Error('kws.js failed to load'));
-      };
-
-      // The id guard lives in the DOM, not on `this`, because it has to survive the
-      // page's own state and more than one `KhipuWeb` instance: never inject a second
-      // `<script id="kws_script_id">`. A script found here may already have fired its
-      // one and only `load` event — it will not fire again — but that is harmless:
-      // the caller already checked the global once, above, before falling back to
-      // this promise at all, and the timeout above still bounds the wait if this
-      // script settled without ever defining `Khipu`.
-      const script = (document.getElementById(KhipuWeb.SCRIPT_ID) as HTMLScriptElement | null) ?? this.injectScript();
-      script.addEventListener('load', onSettled);
-      script.addEventListener('error', onErrored);
+      });
     }).catch((error: unknown) => {
       // Do not cache a failure: a later call should be free to try again.
       this.loading = undefined;
+      if (injectedHere) {
+        script.remove();
+      }
       throw error;
     });
-
-    return this.loading;
   }
 
   /**

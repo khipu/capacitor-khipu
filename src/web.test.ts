@@ -190,4 +190,35 @@ describe('KhipuWeb', () => {
     await expect(first).resolves.toEqual({ result: 'OK' });
     await expect(second).resolves.toEqual({ result: 'OK' });
   });
+
+  it('replaces a dead script instead of reusing one that already loaded garbage', async () => {
+    const first = new KhipuWeb().startOperation({ operationId: 'a', options: {} });
+    const firstScript = document.getElementById('kws_script_id');
+    expect(firstScript).not.toBeNull();
+
+    const firstAssertion = expect(first).rejects.toThrow('kws.js loaded but never defined Khipu');
+    // This script's one and only `load` event, exactly once — real network scripts do
+    // not fire it twice, and this test must not either, or it would stop testing
+    // anything.
+    firstScript?.dispatchEvent(new Event('load'));
+    await firstAssertion;
+
+    const second = new KhipuWeb().startOperation({ operationId: 'b', options: {} });
+    const secondScript = document.getElementById('kws_script_id');
+
+    // The load-bearing assertion: a dead tag that already fired `load` without ever
+    // defining `Khipu` must not survive the failed attempt that created it. If it
+    // did, this would be the exact same node, `secondScript` would attach to an event
+    // that will never come again, and the promise below would only ever settle via
+    // the ten-second timeout — with the wrong diagnosis.
+    expect(secondScript).not.toBeNull();
+    expect(secondScript).not.toBe(firstScript);
+
+    const secondAssertion = expect(second).rejects.toThrow('kws.js loaded but never defined Khipu');
+    // No `vi.advanceTimersByTimeAsync` here on purpose: a fresh script's own `load`
+    // event is enough. If the fix regressed, this would hang until the surrounding
+    // test's own timeout, not settle on the (wrong) 10s timer.
+    secondScript?.dispatchEvent(new Event('load'));
+    await secondAssertion;
+  });
 });
