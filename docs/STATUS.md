@@ -4,11 +4,12 @@
 CI pending a push.
 
 This is the entry point for picking up plugin work without prior context. The design
-and plan for work currently in progress live under `docs/superpowers/`.
+and plan for a pass in progress are kept next to it while it is being worked, and are
+not retained once it lands — this document, not those files, is the durable record.
 
 ## Plugin hardening pass (`plugin-hardening` branch, not yet pushed)
 
-Twelve tasks changed TypeScript, Swift, Java, the two guard scripts, the podspec and CI.
+Twelve tasks changed TypeScript, Swift, Java, the three guard scripts, the podspec and CI.
 What landed:
 
 - **The contract is now optional and documented**: `KhipuOptions` fields that a merchant
@@ -119,13 +120,18 @@ All three lines are published to npm, as of 2026-09-05, with these dist-tags:
   **per-field tri-state**: an "include" toggle distinguishes "key not sent" from "key
   sent with a value" — the same distinction the native SDKs make, and without it their
   default behaviour cannot be tested.
-- **46 tests** where before there were zero for JS and two broken for iOS: 30 JS/TS and
-  guard tests (Vitest), 16 iOS (XCTest).
-- **Two synchronisation guards** in `scripts/`, protecting invariants nothing else
-  watches: that `KhipuClientIOS` stays in sync between `Package.swift` and the podspec,
-  and that the option vocabulary does not drift across its four surfaces
-  (`src/definitions.ts`, the Swift mapper, the Java plugin, and the harness catalogue).
-  Both guards have tests for their failure path, not only their success path.
+- **95 tests** where before there were zero for JS and two broken for iOS: 55 JS/TS and
+  guard tests (Vitest), 24 Android (JUnit), 16 iOS (XCTest).
+- **Three guards** in `scripts/`, protecting invariants nothing else watches: that
+  `KhipuClientIOS` stays in sync between `Package.swift` and the podspec; that every
+  TypeScript block in `README.md` still compiles against `src/index.ts`; and that the
+  option and result vocabulary does not drift, checked as ten surface checks across
+  seven files — `src/definitions.ts` against the Swift options mapper, against
+  `KhipuOptionsMapper.java` (not `KhipuPlugin.java`, which holds no option key at all),
+  against the harness catalogue, and against `src/web.ts`, plus the two result builders,
+  `KhipuPlugin.swift` and `KhipuResultReader.java`, checked back against the same
+  contract. All three guards have tests for their failure path, not only their success
+  path.
 - **CI on GitHub Actions**, the repository's first, running on `main` and `7.x`.
 
 ## CI operational notes
@@ -170,6 +176,12 @@ instrument faithfully measuring an event that never occurred.
 
 ## Verified on device
 
+**As of 2026-09-05**, before this branch moved the Android SDK to `2.28.1` (see "Known
+pending" below — that version has not been re-verified on a device since). Every row
+was run against the SDK version named in the last row, on that date; a later dependency
+bump invalidates only the rows measured against the version that changed, not the rows
+above them.
+
 |                                  | Line 7 (CocoaPods)             | Line 8 (SPM)            |
 | -------------------------------- | ------------------------------ | ----------------------- |
 | iOS: native install              | `pod install`, confirmed       | `CapApp-SPM`, confirmed |
@@ -177,7 +189,7 @@ instrument faithfully measuring an event that never occurred.
 | iOS: `title` and brand colours   | confirmed                      | confirmed               |
 | iOS: dark theme and `showFooter` | not tested                     | confirmed               |
 | Android: builds and renders      | confirmed                      | confirmed               |
-| SDK confirmed at runtime         | iOS `2.16.5`, Android `2.27.0` | iOS `2.16.5`            |
+| SDK version this table measured  | iOS `2.16.5`, Android `2.27.0` | iOS `2.16.5`            |
 
 The biggest risk going in — that SDK resources would fail to load when built by SPM
 instead of CocoaPods — **is resolved**: the bundle changes name and location depending
@@ -281,14 +293,20 @@ it.
   Android SDK ticket `IKW-1233` will make `asJson()` emit nulls to match iOS; since our
   reader omits nulls, that will not change the merchant-visible result and the
   divergence will persist by our choice.
+- **Merchants need no manifest entry for `KhipuActivity`.** The AAR's own
+  `AndroidManifest.xml` declares
+  `<activity android:name="com.khipu.client.KhipuActivity" android:exported="false" …>`;
+  this plugin's manifest is empty and the example app does not declare it either, yet
+  the payment screen renders — the manifest merger injects it from the AAR. Recorded so
+  nobody adds a phantom setup step to the README.
 - **The AAR injects location permissions.** Its manifest declares `INTERNET`,
   `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION`, and the merger puts all three
   into every merchant app. Merchants publishing to Play must declare location use in
   their data safety form. Documenting it in the README was considered and deliberately
   left out of the hardening pass; it wants a channel to the Android SDK team.
 - **An unknown enum value from the protocol can crash the whole process** — tracked as
-  [IKW-1232](https://khipucom.atlassian.net/browse/IKW-1232), the single ticket all four
-  bridge repositories reference. On a failure event the SDK threw
+  `IKW-1232`, the single ticket all four bridge repositories reference. On a failure
+  event the SDK threw
   `JsonMappingException: Cannot deserialize FailureReasonType` inside
   `com.khipu.khenshin.protocol.Converter`, on socket.io's `EventThread`, uncaught: the
   process died, and a dead process cannot resolve or reject anything.
@@ -314,6 +332,10 @@ it.
 
 - **Verify dark mode colour mapping on Android**, and **compare `KhipuResult` fields
   between iOS and Android** on the same operation.
+- **`khipu-client-android 2.28.1` has never been exercised at runtime here.** "Verified
+  on device" above is against `2.27.0`; the evidence for `2.28.1` is a clean Gradle
+  build plus the jar's own version markers, not a device run. Re-verify on device
+  before trusting that table for `2.28.1`.
 - **Exercise `canOpenURL` on a physical device** with a bank app installed. The nine
   `LSApplicationQueriesSchemes` are still verified only as a declaration.
 - **`exitUrl` shipped mistyped in `2.11.2` and `2.11.3`** (`string` instead of
