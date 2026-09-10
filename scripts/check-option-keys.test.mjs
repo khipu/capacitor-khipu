@@ -68,11 +68,16 @@ function fixture({ contract = OPTIONS, harness = OPTIONS, resolve = RESULT, web 
     `func map() {\n${reads(OPTIONS, 'options')}\n    _ = options["colors"]\n${reads(COLORS, 'colors')}\n}\n`,
   );
 
-  const has = (keys, object) => keys.map((k) => `    ${object}.has("${k}");`).join('\n');
+  // Mirrors KhipuOptionsMapper.java's real call shape: `string(options, "key")` /
+  // `bool(options, "key")` for options, `string(colors, "key")` for colors. The
+  // `colors` container itself is read via `options.getJSObject("colors")`, which
+  // matches neither pattern — kept here so a stray "colors" key never sneaks into the
+  // options set (that's what `withoutColors` guards against downstream).
+  const mapperCalls = (keys, object) => keys.map((k) => `    string(${object}, "${k}");`).join('\n');
   write(
     dir,
-    'android/src/main/java/com/khipu/capacitor/KhipuPlugin.java',
-    `class KhipuPlugin {\n${has(OPTIONS, 'options')}\n    options.has("colors");\n${has(COLORS, 'colors')}\n}\n`,
+    'android/src/main/java/com/khipu/capacitor/KhipuOptionsMapper.java',
+    `class KhipuOptionsMapper {\n${mapperCalls(OPTIONS, 'options')}\n    options.getJSObject("colors");\n${mapperCalls(COLORS, 'colors')}\n}\n`,
   );
 
   const entries = (keys) => keys.map((k) => `  { key: '${k}' },`).join('\n');

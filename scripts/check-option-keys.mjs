@@ -3,7 +3,7 @@
  * Fails if the five surfaces that declare the options vocabulary stop matching.
  *
  * The contract between JS and native is made of strings: `src/definitions.ts` declares
- * it, the Swift mapper and the Java plugin read it, and the harness offers it. Renaming
+ * it, the Swift mapper and the Java mapper read it, and the harness offers it. Renaming
  * a key on just one surface leaves the flag with no effect **silently** — no test on
  * either side can detect the other one drifting.
  *
@@ -34,7 +34,7 @@ import { readFileSync } from 'node:fs';
 const BASE = process.argv[2] ?? '.';
 const CONTRACT = `${BASE}/src/definitions.ts`;
 const SWIFT = `${BASE}/ios/Sources/KhipuPlugin/KhipuOptionsMapper.swift`;
-const JAVA = `${BASE}/android/src/main/java/com/khipu/capacitor/KhipuPlugin.java`;
+const MAPPER = `${BASE}/android/src/main/java/com/khipu/capacitor/KhipuOptionsMapper.java`;
 const HARNESS = `${BASE}/example/src/js/fields.js`;
 const PLUGIN = `${BASE}/ios/Sources/KhipuPlugin/KhipuPlugin.swift`;
 const WEB = `${BASE}/src/web.ts`;
@@ -91,7 +91,7 @@ if (options.size < 5 || colors.size < 8 || result.size < 5) {
 }
 
 const swift = read(SWIFT);
-const java = read(JAVA);
+const mapper = read(MAPPER);
 const sections = read(HARNESS).split('export const COLOR_FIELDS');
 
 const web = read(WEB);
@@ -117,8 +117,12 @@ if (webUnsupported.size < 2 || webUnsupportedColors.size < 4) {
 const surfaces = [
   { name: `${SWIFT} (options)`, expected: options, actual: withoutColors(keys(swift, /options\["(\w+)"\]/g)) },
   { name: `${SWIFT} (colors)`, expected: colors, actual: keys(swift, /colors\["(\w+)"\]/g) },
-  { name: `${JAVA} (options)`, expected: options, actual: withoutColors(keys(java, /options\.\w+\("(\w+)"/g)) },
-  { name: `${JAVA} (colors)`, expected: colors, actual: keys(java, /colors\.\w+\("(\w+)"/g) },
+  {
+    name: `${MAPPER} (options)`,
+    expected: options,
+    actual: withoutColors(keys(mapper, /\b(?:string|bool)\(options, "(\w+)"/g)),
+  },
+  { name: `${MAPPER} (colors)`, expected: colors, actual: keys(mapper, /\bstring\(colors, "(\w+)"/g) },
   { name: `${HARNESS} (options)`, expected: options, actual: keys(sections[0], /key: '(\w+)'/g) },
   {
     name: `${HARNESS} (colors)`,
