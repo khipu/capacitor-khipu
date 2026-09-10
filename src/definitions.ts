@@ -73,6 +73,12 @@ export interface KhipuOptions {
   /**
    * Color scheme for the payment screen.
    *
+   * Leaving this out follows the device's own setting on all three platforms — the
+   * same as sending `'system'` explicitly. Say so plainly because it was not always
+   * true: web used to default to light regardless of the device, so the same payment
+   * could render light on web and dark on the phone with nothing in the merchant's
+   * code to explain it.
+   *
    * On web, `'system'` is resolved locally via `prefers-color-scheme`, and the
    * result then picks between `colors.lightPrimary` and `colors.darkPrimary` — the
    * only two color overrides web applies. See `KhipuColors`.

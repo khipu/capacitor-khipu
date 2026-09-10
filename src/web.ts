@@ -1,110 +1,165 @@
 import { WebPlugin } from '@capacitor/core';
 
-import type { KhipuPlugin, KhipuResult, StartOperationOptions } from './definitions';
+import type { KhipuColors, KhipuOptions, KhipuPlugin, KhipuResult, StartOperationOptions } from './definitions';
+
+/** The slice of the kws.js widget this plugin drives. */
+interface KwsWidget {
+  startOperation(descriptor: string, callback: (result: KhipuResult) => void, settings: KwsSettings): unknown;
+}
+
+/**
+ * Settings kws.js actually reads. `locale` sits at the root, not inside `options` —
+ * `renderIframe` forwards `this.settings.locale`, and a `locale` nested under
+ * `options` is dropped without a word.
+ */
+interface KwsSettings {
+  mountElement: HTMLElement;
+  modal: boolean;
+  locale?: string;
+  options: {
+    style: { theme: 'light' | 'dark'; primaryColor?: string };
+    skipExitPage: boolean;
+    skipExitSuccessPage: boolean;
+  };
+}
+
+declare global {
+  interface Window {
+    Khipu?: new () => KwsWidget;
+  }
+}
+
+/**
+ * Options the web layer deliberately does not send, because the loader has nowhere to
+ * put them. Declared rather than merely omitted so `check-option-keys.mjs` can force a
+ * decision when a new option is added to the contract.
+ */
+export const WEB_UNSUPPORTED: readonly (keyof KhipuOptions)[] = [
+  'title',
+  'titleImageUrl',
+  'showFooter',
+  'showMerchantLogo',
+  'showPaymentDetails',
+];
+
+/** Colours with no equivalent in the loader's `style` object. */
+export const WEB_UNSUPPORTED_COLORS: readonly (keyof KhipuColors)[] = [
+  'lightBackground',
+  'lightOnBackground',
+  'lightOnPrimary',
+  'lightTopBarContainer',
+  'lightOnTopBarContainer',
+  'darkBackground',
+  'darkOnBackground',
+  'darkOnPrimary',
+  'darkTopBarContainer',
+  'darkOnTopBarContainer',
+];
 
 export class KhipuWeb extends WebPlugin implements KhipuPlugin {
-  private static KWS_SCRIPT_ID = 'kws_script_id';
-  private static KHIPU_WEB_ROOT = 'khipu-web-root';
-  private static KWS_TIMEOUT = 10_000;
+  private static readonly SCRIPT_ID = 'kws_script_id';
+  private static readonly ROOT_ID = 'khipu-web-root';
+  private static readonly SCRIPT_SRC = 'https://js.khipu.com/v1/kws.js';
+  private static readonly LOAD_TIMEOUT_MS = 10_000;
 
-  private khipu: any;
+  private loading?: Promise<KwsWidget> | undefined;
 
-  constructor() {
-    super();
-    this.addKws();
-    this.addKhipuWebRoot();
+  async startOperation(call: StartOperationOptions): Promise<KhipuResult> {
+    const widget = await this.widget();
+    return this.run(widget, call);
   }
 
-  async startOperation(options: StartOperationOptions): Promise<KhipuResult> {
-    this.addKws();
-    this.addKhipuWebRoot();
-    await this.ensureKhipuIsSet();
-    return this.startKhipu(options);
-  }
+  /**
+   * Injects kws.js on first use, never on construction: the merchant's app should not
+   * pay for a third-party script on every page view just because the plugin is
+   * registered.
+   */
+  private widget(): Promise<KwsWidget> {
+    if (window.Khipu) {
+      return Promise.resolve(new window.Khipu());
+    }
 
-  addKws(): void {
-    if (!document.getElementById(KhipuWeb.KWS_SCRIPT_ID)) {
+    this.loading ??= new Promise<KwsWidget>((resolve, reject) => {
       const script = document.createElement('script');
-      script.id = KhipuWeb.KWS_SCRIPT_ID;
-      script.type = 'text/javascript';
-      script.src = 'https://js.khipu.com/v1/kws.js';
-      document.head.appendChild(script);
-    }
-  }
+      const timer = setTimeout(() => reject(new Error('timed out waiting for kws.js')), KhipuWeb.LOAD_TIMEOUT_MS);
 
-  addKhipuWebRoot(): void {
-    if (!document.getElementById(KhipuWeb.KHIPU_WEB_ROOT)) {
-      const div = document.createElement('div');
-      div.id = KhipuWeb.KHIPU_WEB_ROOT;
-      document.body.appendChild(div);
-    }
-  }
-
-  ensureKhipuIsSet(): Promise<any> {
-    const start = Date.now();
-    return new Promise(waitForKhipu); // set the promise object within the ensureFooIsSet object
-    function waitForKhipu(resolve: (arg0: any) => void, reject: (arg0: Error) => void) {
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      if (typeof Khipu !== 'undefined') {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        resolve(Khipu);
-      } else if (KhipuWeb.KWS_TIMEOUT && Date.now() - start >= KhipuWeb.KWS_TIMEOUT)
-        reject(new Error('timeout waiting for kws to inject Khipu'));
-      else {
-        setTimeout(() => {
-          waitForKhipu(resolve, reject);
-        }, 50);
-      }
-    }
-  }
-
-  async startKhipu(options: StartOperationOptions): Promise<any> {
-    return new Promise((resolve) => {
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      this.khipu = new Khipu();
-
-      // `options.options` is optional: an absent presentation options object is
-      // equivalent to an empty one, matching how Android and iOS default it.
-      const presentation = options.options ?? {};
-
-      let theme = presentation.theme ?? 'light';
-      if (theme === 'system') {
-        if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
-          theme = 'dark';
+      script.addEventListener('load', () => {
+        clearTimeout(timer);
+        if (window.Khipu) {
+          resolve(new window.Khipu());
         } else {
-          theme = 'light';
+          reject(new Error('kws.js loaded but never defined Khipu'));
         }
-      }
-      let primaryColor = undefined;
-      if (theme === 'light' && presentation.colors?.lightPrimary !== undefined) {
-        primaryColor = presentation.colors?.lightPrimary;
-      } else if (theme === 'dark' && presentation.colors?.darkPrimary !== undefined) {
-        primaryColor = presentation.colors?.darkPrimary;
-      }
+      });
+      script.addEventListener('error', () => {
+        clearTimeout(timer);
+        reject(new Error('kws.js failed to load'));
+      });
 
-      const khipuOptions = {
-        mountElement: document.getElementById(KhipuWeb.KHIPU_WEB_ROOT), //Elemento ancla
-        modal: true,
-        options: {
-          style: {
-            ...(primaryColor !== undefined ? { primaryColor: primaryColor } : {}),
-            theme: theme,
-          },
-          skipExitPage: presentation.skipExitPage !== undefined ? presentation.skipExitPage : false,
-          skipExitSuccessPage:
-            presentation.skipExitSuccessPage !== undefined ? presentation.skipExitSuccessPage : false,
-        },
-      };
-      this.khipu.startOperation(
-        options.operationId,
-        (result: KhipuResult) => {
-          resolve(result);
-        },
-        khipuOptions,
-      );
+      script.id = KhipuWeb.SCRIPT_ID;
+      script.type = 'text/javascript';
+      script.src = KhipuWeb.SCRIPT_SRC;
+      document.head.appendChild(script);
+    }).catch((error: unknown) => {
+      // Do not cache a failure: a later call should be free to try again.
+      this.loading = undefined;
+      throw error;
     });
+
+    return this.loading;
+  }
+
+  private run(widget: KwsWidget, call: StartOperationOptions): Promise<KhipuResult> {
+    const opts: KhipuOptions = call.options ?? {};
+    const theme = KhipuWeb.theme(opts.theme);
+    const colors = opts.colors;
+    const primaryColor = theme === 'dark' ? colors?.darkPrimary : colors?.lightPrimary;
+
+    return new Promise<KhipuResult>((resolve, reject) => {
+      try {
+        widget.startOperation(call.operationId, resolve, {
+          mountElement: this.mountElement(),
+          modal: true,
+          ...(opts.locale !== undefined ? { locale: opts.locale } : {}),
+          options: {
+            style: { theme, ...(primaryColor !== undefined ? { primaryColor } : {}) },
+            skipExitPage: opts.skipExitPage ?? false,
+            skipExitSuccessPage: opts.skipExitSuccessPage ?? false,
+          },
+        });
+      } catch (error: unknown) {
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+  }
+
+  /**
+   * Resolves to what kws.js understands, which is only light or dark.
+   *
+   * An absent theme follows the system rather than falling back to light. Both native
+   * SDKs default to SYSTEM (`KhipuOptions.kt:37`, `KhipuOptions.swift:68`), so web
+   * quietly choosing light meant the same payment rendered light on web and dark on the
+   * phone, with nothing in the merchant's code to explain it.
+   */
+  private static theme(theme: KhipuOptions['theme']): 'light' | 'dark' {
+    if (theme === 'dark') {
+      return 'dark';
+    }
+    if (theme === 'light') {
+      return 'light';
+    }
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  private mountElement(): HTMLElement {
+    const existing = document.getElementById(KhipuWeb.ROOT_ID);
+    if (existing) {
+      return existing;
+    }
+
+    const root = document.createElement('div');
+    root.id = KhipuWeb.ROOT_ID;
+    document.body.appendChild(root);
+    return root;
   }
 }
