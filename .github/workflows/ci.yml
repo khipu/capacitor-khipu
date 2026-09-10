@@ -24,6 +24,7 @@ jobs:
       - run: npm test
       - run: npm run verify:versions
       - run: npm run verify:keys
+      - run: npm run verify:readme
       - run: npm run verify:web
 
   ios:
