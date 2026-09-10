@@ -63,20 +63,27 @@ final class KhipuOptionsMapperTests: XCTestCase {
         XCTAssertNil(KhipuOptionsMapper.draft(from: ["theme": "neon"]).theme)
     }
 
+    // Each of the twelve is a distinct value, on purpose: the option-keys guard already
+    // protects against a renamed key, but it can't see a swap of two correct keys to
+    // the wrong builder assignment, e.g. `lightOnBackground` assigned `lightBackground`'s
+    // value. Distinct values make that swap show up as a wrong value here instead of
+    // passing by coincidence, which repeated hex strings (the previous fixture reused
+    // "#FFFFFF", "#8347AD" and "#3CB4E5" across unrelated fields) would let slip through
+    // undetected. Mirrors `KhipuOptionsMapperTest.java`'s `mapsTheTwelveColors`.
     func testMapsTheTwelveColors() {
         let colors: JSObject = [
-            "lightBackground": "#FFFFFF",
-            "lightOnBackground": "#1A1A1A",
-            "lightPrimary": "#8347AD",
-            "lightOnPrimary": "#FFFFFF",
-            "lightTopBarContainer": "#8347AD",
-            "lightOnTopBarContainer": "#FFFFFF",
-            "darkBackground": "#121212",
-            "darkOnBackground": "#EDEDED",
-            "darkPrimary": "#3CB4E5",
-            "darkOnPrimary": "#0B0B0B",
-            "darkTopBarContainer": "#1E1E1E",
-            "darkOnTopBarContainer": "#3CB4E5"
+            "lightBackground": "#111111",
+            "lightOnBackground": "#222222",
+            "lightPrimary": "#333333",
+            "lightOnPrimary": "#444444",
+            "lightTopBarContainer": "#555555",
+            "lightOnTopBarContainer": "#666666",
+            "darkBackground": "#777777",
+            "darkOnBackground": "#888888",
+            "darkPrimary": "#999999",
+            "darkOnPrimary": "#AAAAAA",
+            "darkTopBarContainer": "#BBBBBB",
+            "darkOnTopBarContainer": "#CCCCCC"
         ]
 
         let draft = KhipuOptionsMapper.draft(from: ["colors": colors])
@@ -84,18 +91,18 @@ final class KhipuOptionsMapperTests: XCTestCase {
         XCTAssertEqual(
             draft.colors,
             KhipuColorsDraft(
-                lightBackground: "#FFFFFF",
-                lightOnBackground: "#1A1A1A",
-                lightPrimary: "#8347AD",
-                lightOnPrimary: "#FFFFFF",
-                lightTopBarContainer: "#8347AD",
-                lightOnTopBarContainer: "#FFFFFF",
-                darkBackground: "#121212",
-                darkOnBackground: "#EDEDED",
-                darkPrimary: "#3CB4E5",
-                darkOnPrimary: "#0B0B0B",
-                darkTopBarContainer: "#1E1E1E",
-                darkOnTopBarContainer: "#3CB4E5"
+                lightBackground: "#111111",
+                lightOnBackground: "#222222",
+                lightPrimary: "#333333",
+                lightOnPrimary: "#444444",
+                lightTopBarContainer: "#555555",
+                lightOnTopBarContainer: "#666666",
+                darkBackground: "#777777",
+                darkOnBackground: "#888888",
+                darkPrimary: "#999999",
+                darkOnPrimary: "#AAAAAA",
+                darkTopBarContainer: "#BBBBBB",
+                darkOnTopBarContainer: "#CCCCCC"
             )
         )
     }
