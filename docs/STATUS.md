@@ -1,7 +1,7 @@
 # Status
 
 **Last updated:** 2026-09-11 — `plugin-hardening` branch, Android SDK bumped to
-`2.28.4`, local verification complete, CI pending a push.
+`2.28.4` and iOS SDK to `2.17.1`, local verification complete, CI pending a push.
 
 This is the entry point for picking up plugin work without prior context. The design
 and plan for a pass in progress are kept next to it while it is being worked, and are
@@ -36,12 +36,15 @@ What landed:
   terminal message the socket guard now calls `returnToApp()` instead of leaving it
   unhandled, and `buildResult` has a branch for the unprocessable case, so the
   `PluginCall` resolves instead of hanging — see the `IKW-1232` entry below for exactly
-  what the merchant now receives. **The iOS SDK moved to `KhipuClientIOS 2.16.6`**, in
-  sync across `Package.swift` and the podspec, fixing a socket frame that could kill the
-  merchant's app and a terminal-message parse failure that left the payer with no exit
-  while the merchant got no callback; it also pins Starscream, closing a CocoaPods/SPM
-  resolution divergence that matters here because this plugin ships both managers.
-  `KhipuClientIOS 2.17.0` is now published but not taken — see "Known pending".
+  what the merchant now receives. **The iOS SDK moved to `KhipuClientIOS 2.16.6`, then
+  to `2.17.1`**, in sync across `Package.swift` and the podspec throughout, fixing a
+  socket frame that could kill the merchant's app and a terminal-message parse failure
+  that left the payer with no exit while the merchant got no callback; it also pins
+  Starscream, closing a CocoaPods/SPM resolution divergence that matters here because
+  this plugin ships both managers. `2.17.0` was skipped: it fixed two real defects
+  (denying the location permission no longer ends the operation, matching Android; a
+  CoreLocation failure no longer hangs) but introduced a wrong-label one of its own,
+  fixed in `2.17.1` — see "Known pending" for the resolution.
 - **The vocabulary guard (`verify:keys`) now covers the web surface and both platforms'
   return path**, not just the options each platform reads: it checks `src/web.ts`
   against `src/definitions.ts`, and checks the result fields both the iOS and Android
@@ -189,6 +192,14 @@ Two habits catch these, and they catch different failures:
 
 The second is the one usually skipped, and it covers the worse case: a healthy
 instrument faithfully measuring an event that never occurred.
+
+A variety this section didn't have yet, measured by a peer project: `pod trunk push`
+failed with the same `Calling the GitHub commit API timed out` error and the same exit
+code across four consecutive releases — and two of them published anyway while two did
+not. Nothing in the message or the exit status tells the two outcomes apart. The
+entries above are about a *check* that cannot see; this one is about a *tool* whose own
+success and failure look identical in its output. The report cannot be the verdict —
+the state has to be checked afterwards, independently.
 
 ## Verified on device
 
@@ -439,21 +450,22 @@ it.
   `releaseRuntimeClasspath`, plus the jar's own bytecode markers, not a device run.
   Re-verify on device before trusting that table for `2.28.4`, and before trusting the
   merchant-visible fields recorded above for the undecodable-terminal-message case.
-- **`KhipuClientIOS 2.16.6` has never been exercised at runtime here either.** "Verified
-  on device" above is against `2.16.5`; the evidence for `2.16.6` is a clean
-  `xcodebuild build` plus the package's own version pin, not a device run. Re-verify on
-  device before trusting that table for `2.16.6`.
-- **Staying on `KhipuClientIOS 2.16.6`, not moving to `2.17.0`, is a decision to
-  revisit — not a permanent position.** `2.17.0` is published and fixes two real
-  defects: denying the location permission used to end the operation and return to the
-  merchant's app, where now the payment continues instead, matching Android; and any
-  CoreLocation failure used to leave the payment stuck on a spinner with no way out. But
-  `2.17.0` **introduces a known defect**: an unreadable terminal message makes the
-  merchant receive `failureReason: "USER_CANCELED"` when the SDK simply could not read
-  it — a wrong label, not a missing one. It is fixed in `IKW-1245`, merged and **not
-  released**. Taking `2.17.0` today would trade a hang the payer can see for a wrong
-  label the merchant's code will act on — logging a cancellation that never happened.
-  We wait for the release carrying `IKW-1245`.
+- **`KhipuClientIOS 2.17.1` has never been exercised at runtime here either.** "Verified
+  on device" above is against `2.16.5`; the evidence for `2.17.1` (by way of `2.16.6`)
+  is a clean `xcodebuild build` plus the package's own version pin, not a device run.
+  Re-verify on device before trusting that table for `2.17.1`.
+- **Resolved: took `KhipuClientIOS 2.17.1`, not `2.17.0`.** We held at `2.16.6` because
+  `2.17.0` fixed two real defects — denying the location permission used to end the
+  operation and return to the merchant's app, and any CoreLocation failure used to leave
+  the payment stuck on a spinner with no way out — but **introduced** a wrong-label
+  defect of its own: an unreadable terminal message made the merchant receive
+  `failureReason: "USER_CANCELED"` when the SDK simply could not read it. Taking
+  `2.17.0` then would have traded a hang the payer can see for a wrong label the
+  merchant's code would act on. `IKW-1245`, the fix for that defect, has now shipped in
+  `2.17.1`. The wait bought exactly what it was for: both `2.17.x` fixes land — denying
+  location no longer ends the operation, matching Android, and a CoreLocation failure no
+  longer hangs — without the wrong-label defect ever reaching a merchant. The hold is
+  resolved, not abandoned.
 - **Exercise `canOpenURL` on a physical device** with a bank app installed. The nine
   `LSApplicationQueriesSchemes` are still verified only as a declaration.
 - **`exitUrl` shipped mistyped in `2.11.2` and `2.11.3`** (`string` instead of
