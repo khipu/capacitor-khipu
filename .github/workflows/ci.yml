@@ -107,3 +107,9 @@ jobs:
           npx cap sync ios
           xcodebuild build -workspace ios/App/App.xcworkspace -scheme App -destination generic/platform=iOS CODE_SIGNING_ALLOWED=NO
         working-directory: example
+      - name: Sincronizar Android
+        run: npx cap sync android
+        working-directory: example
+      - name: Build de Android
+        run: ./gradlew assembleDebug
+        working-directory: example/android
