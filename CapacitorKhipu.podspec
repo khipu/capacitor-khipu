@@ -13,6 +13,6 @@ Pod::Spec.new do |s|
   s.source_files = 'ios/Sources/**/*.{swift,h,m,c,cc,mm,cpp}'
   s.ios.deployment_target = '14.0'
   s.dependency 'Capacitor'
-  s.dependency 'KhipuClientIOS', '2.16.6'
+  s.dependency 'KhipuClientIOS', '2.17.1'
   s.swift_version = '5.9'
 end

@@ -9,7 +9,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "7.0.0"),
-        .package(url: "https://github.com/khipu/KhipuClientIOS.git", exact: "2.16.6")
+        .package(url: "https://github.com/khipu/KhipuClientIOS.git", exact: "2.17.1")
     ],
     targets: [
         .target(
