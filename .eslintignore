@@ -1,6 +1,6 @@
 build
 dist
 
-# Bundles web que Capacitor copia a las plataformas nativas en cada `cap sync`.
+# Web bundles that Capacitor copies to the native platforms on every `cap sync`.
 example/ios/App/App/public
 example/android/app/src/main/assets/public
