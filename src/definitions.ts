@@ -11,14 +11,20 @@ export interface KhipuPlugin {
    * `result: 'OK'`, `'ERROR'`, `'WARNING'` or `'CONTINUE'` in every case. See
    * `KhipuResult.result` for what abandonment looks like.
    *
-   * Calling this a second time while an operation is already in flight rejects the
-   * second call instead of hanging or replacing the first one — the first operation's
-   * screen is still on screen and will still deliver a result to it, which could be a
-   * payment that went through. The rejection carries an error code only on Android
-   * (`'INVALID_OPTIONS'`, `'OPERATION_IN_PROGRESS'`, `'LAUNCH_FAILED'` or
-   * `'NO_RESULT'`, from `KhipuPlugin.java`); iOS rejects with no code, and web rejects
-   * a bare `Error`. Do not write `e.code === 'OPERATION_IN_PROGRESS'` and expect it to
-   * work on every platform.
+   * Android refuses a second, concurrent call while the first is genuinely still in
+   * flight, rejecting it with `'OPERATION_IN_PROGRESS'` instead of hanging or replacing
+   * the first one — the first operation's screen is still on screen and will still
+   * deliver a result to it, which could be a payment that went through. iOS and web do
+   * not currently guard against this: a second call proceeds, opening another payment
+   * flow on iOS or re-mounting into the same root on web.
+   *
+   * Error codes are Android-only, from `KhipuPlugin.java`, and only
+   * `'OPERATION_IN_PROGRESS'` signals this concurrency rejection. The other three come
+   * from unrelated paths: `'INVALID_OPTIONS'` from a missing `operationId` or an
+   * unreadable `options` object, `'LAUNCH_FAILED'` from the native activity failing to
+   * launch, and `'NO_RESULT'` from the activity returning with no result. iOS rejects
+   * with no code, and web rejects a bare `Error`. Do not write
+   * `e.code === 'OPERATION_IN_PROGRESS'` and expect it to work on every platform.
    */
   startOperation(options: StartOperationOptions): Promise<KhipuResult>;
 }
