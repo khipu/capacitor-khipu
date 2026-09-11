@@ -302,6 +302,38 @@ and `2.11.3` was published specifically for this.
 The exercise also reproduced, outside the harness, the `locale` divergence: the same
 operation with no `locale` came up in Spanish on iOS and in English on Android.
 
+### This round (`plugin-hardening`, pre-publish)
+
+This branch has not been published, so the exercise above could not be repeated as
+written: installing by dist-tag would have tested the old release, not this branch's
+code. Instead, two apps were built from nothing, Capacitor 7 and Capacitor 8, each
+installing the plugin from a **local `npm pack` tarball** rather than a dist-tag.
+Packing also exercises the `files` array in `package.json` — the same place a package
+can ship incomplete and nobody finds out until after publishing.
+
+Both lines were built on **both** native platforms. **This line's app — Capacitor 7 —
+went through CocoaPods**: `npx cap sync ios` ran `pod install` itself and produced a
+workspace, resolving `KhipuClientIOS 2.16.6` and `Starscream 4.0.8`. The Capacitor 8 app
+used SPM (`CapApp-SPM`, no Podfile). The Starscream pin exists so the two package
+managers stop resolving different dependency graphs, and this is the first time both
+paths were exercised against it.
+
+The README's usage snippets were copied literally into a **TypeScript strict** file, and
+`tsc --noEmit` passed on both lines. This check is now part of the recipe because the
+previous round bundled with esbuild alone, which strips types without checking them —
+exactly how a contract requiring every option key shipped with a README example that did
+not compile.
+
+Kotlin-free Android builds succeeded on both lines. **This line's** ran at AGP `8.7.2`
+— the exact boundary where the README's "you do not need Kotlin" claim starts being
+true, which makes it the stronger data point: the Capacitor 8 app's Kotlin-free build
+ran at AGP `8.13.0`, well past the boundary, where a regression at the edge would not
+show up.
+
+**Not verified: no real payment was run on either line.** There are no Khipu API
+credentials in this environment, so there is no `operationId`, so nothing past the
+plugin being wired in and callable was exercised.
+
 ## Cross-SDK finding to report upstream
 
 **The two native SDKs disagree on the `locale` default.** When the merchant does not
