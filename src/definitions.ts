@@ -247,9 +247,12 @@ export interface KhipuResult {
    * check it before using it.
    *
    * When absent, iOS sends it as JSON `null` while Android omits the key entirely —
-   * both are valid under how each platform's bridge serialises a nil/absent optional,
-   * and neither is going to change (see `docs/STATUS.md`, "Known pending"). Compare
-   * with truthiness or `??`, not `=== undefined`, so it reads the same on both.
+   * both are valid under how each platform's bridge serialises a nil/absent optional.
+   * Aligning the two is under consideration, not decided: it would most likely mean
+   * changing iOS to omit the key like Android, which is a breaking change for existing
+   * iOS merchants and would need a major version (see `docs/STATUS.md`,
+   * "Known pending"). Compare with truthiness or `??`, not `=== undefined`, so it
+   * reads the same either way today.
    */
   exitUrl: string | undefined;
   // Never add 'CANCELED' (or any other value) to this union without a major version
