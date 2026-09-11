@@ -487,38 +487,52 @@ throwing no longer reaches socket.io's `EventThread`. As of this writing the fix
 a branch and neither merged nor released; it is expected as a patch bump, `2.28.1`, with
 no date. Nothing in this plan waits for it.
 
-Two consequences of that fix reach this plugin, and both are behaviour we must already
-be correct about:
+Two consequences of that fix reach this plugin. One is real product behaviour we
+already handle correctly. The other was recorded here as handled, and it is not —
+corrected below with the evidence, because the mistake is worth being able to check.
 
-- **A terminal message that fails to deserialise now ends the operation**, so the
-  launcher callback fires and the promise settles — but the `KhipuResult` may arrive
-  with no `failureReason`, precisely because the detail is what failed to parse. Section
-  C5's reader already handles this: it skips null values, so the key is simply absent
-  and reads as `undefined`, which is what `failureReason: string | undefined` promises.
-  A test asserts it rather than leaving it to inference.
-- **A non-terminal message that fails is logged and ignored**, and the operation
-  continues. This is a genuine product trade-off for messages that really are
-  non-terminal, such as `FORM_REQUEST`: the payer waits for a form that will never
-  render, no crash, no exit. For us that means the activity stays up and the
-  `PluginCall` stays genuinely in flight, so C4's liveness check reports it live and a
-  second `startOperation` is refused — which is correct, because the first really is
-  still running. The escape is the payer cancelling, which the SDK routes through its
-  back dialog to a normal `RESULT_OK`. Worth knowing when a merchant reports a payment
-  that "hangs" with no error.
+- **A message that is genuinely non-terminal and fails to deserialise is logged and
+  ignored**, and the operation continues. This is a genuine product trade-off for
+  messages that really are non-terminal, such as `FORM_REQUEST`: the payer waits for a
+  form that will never render, no crash, no exit. For us that means the activity stays
+  up and the `PluginCall` stays genuinely in flight, so C4's liveness check reports it
+  live and a second `startOperation` is refused — which is correct, because the first
+  really is still running. The escape is the payer cancelling, which the SDK routes
+  through its back dialog to a normal `RESULT_OK`. Worth knowing when a merchant
+  reports a payment that "hangs" with no error.
 
-  `2.28.1`'s guard put `OPERATION_WARNING` in this same bucket, but that was a defect,
-  not a decision: `OPERATION_WARNING` has its own handler that finishes the operation,
-  same as the three types the guard did list as terminal
-  (`OPERATION_FAILURE`/`OPERATION_MUST_CONTINUE`/`OPERATION_SUCCESS`). A
-  failed-to-deserialise `OPERATION_WARNING` therefore hung forever under `2.28.1` —
-  same symptom as the genuine `FORM_REQUEST` trade-off above, including feeding C4's
-  liveness guard into permanently refusing every later `startOperation` on that call,
-  but with no accepted trade-off behind it: nobody chose to ignore `OPERATION_WARNING`,
-  it was left out of the terminal set by mistake. Fixed in `2.28.3`, which adds
-  `OPERATION_WARNING` to the terminal set — confirmed directly against the artifact's
-  bytecode (`SocketMessageGuardKt`), not just the version number. This branch now
-  depends on `2.28.3`. The trade-off described above remains real for genuinely
-  non-terminal messages; the defect did not.
+- **A *terminal* message that fails to deserialise does not end the operation
+  either — it hangs exactly the same way, with no launcher callback and no settled
+  promise.** Verified directly against `khipu-client-android 2.28.3` source:
+  `operationFinished` (`KhipuActivity.kt:307`, `:588`) only gates the socket
+  connection and a snackbar — nothing returns to the host app because of it.
+  `buildResult(...)` runs exactly once (`KhipuActivity.kt:318`), inside
+  `if (khipuUiState.returnToApp)`, and every `returnToApp()` call site is either a
+  payer action (the cancel dialog at `:232`, the manual-transfer path at `:328`) or
+  sits inside `operationSuccess?.let`, `operationFailure?.let` or
+  `operationWarning?.let` (`:445`, `:458`, `:491`) — all null, and so skipped, when
+  deserialisation failed. There is no inactivity timer. So this is the same symptom as
+  the `FORM_REQUEST` trade-off above, including feeding C4's liveness guard into
+  permanently refusing every later `startOperation` on that call — except here there is
+  no accepted product trade-off behind it, and no version of the SDK fixes it. The only
+  recoveries are the payer pressing back and confirming the cancel dialog, or this
+  plugin's bridge clearing `savedCalls` on a WebView navigation.
+
+  `2.28.1`'s guard put `OPERATION_WARNING` in the non-terminal bucket, but that was a
+  defect, not a decision: `OPERATION_WARNING` has its own handler that finishes the
+  operation, same as the three types the guard did list as terminal
+  (`OPERATION_FAILURE`/`OPERATION_MUST_CONTINUE`/`OPERATION_SUCCESS`). Fixed in
+  `2.28.3`, which adds `OPERATION_WARNING` to the terminal set — confirmed directly
+  against the artifact's bytecode (`SocketMessageGuardKt`), not just the version
+  number. This branch now depends on `2.28.3`. That fix is about a *decodable*
+  `OPERATION_WARNING` being tracked the same as the other three terminal types for
+  `operationFinished` bookkeeping (the socket connection, the snackbar) — it does
+  nothing for an *undecodable* message of any terminal type, `OPERATION_WARNING`
+  included, which is the hang described above and is not fixed by this bump or any
+  other. What `2.28.1`/`2.28.3` does fix, and what justifies the bump on its own, is
+  that before `2.28.1` this whole scenario reached socket.io's `EventThread` uncaught
+  and killed the merchant's process. Going from "kills the app" to "the call hangs" is
+  a real improvement; it is just not the one this section used to claim.
 
 The protocol generator itself is untouched, so hardening the deserialisation remains
 open on the SDK side.

@@ -25,9 +25,15 @@ What landed:
 - **Android has a tested mapper and result reader**, and **refuses a concurrent
   operation** instead of leaving a second call to interfere with one already in flight.
 - **The Android SDK moved to `2.28.3`** (`com.khipu:khipu-client-android`), fixing a
-  defect in `2.28.1`: the socket guard omitted `OPERATION_WARNING` from its terminal
-  message types, so an undecodable one left the operation unfinished and the call in
-  flight forever. **The iOS SDK moved to `KhipuClientIOS 2.16.6`**, in sync across
+  defect in `2.28.1`: the socket guard's terminal-type list omitted `OPERATION_WARNING`,
+  even though `OPERATION_WARNING` has its own handler that finishes the operation
+  exactly like the three types the guard did list; `2.28.3` adds it. That fix is about a
+  *decodable* `OPERATION_WARNING` being tracked correctly — it does nothing for an
+  *undecodable* message of any terminal type, which still leaves the call in flight
+  indefinitely in `2.28.3` exactly as in `2.28.1` (see the `IKW-1232` entry below for the
+  evidence and the two recoveries). What the bump actually buys is that this scenario
+  used to kill the merchant's process outright before `2.28.1`; now it only hangs the
+  call. **The iOS SDK moved to `KhipuClientIOS 2.16.6`**, in sync across
   `Package.swift` and the podspec, fixing a socket frame that could kill the merchant's
   app and a terminal-message parse failure that left the payer with no exit while the
   merchant got no callback; it also pins Starscream, closing a CocoaPods/SPM resolution
@@ -357,10 +363,22 @@ it.
     `forValue` recognises it.
   - _The mechanism_ is fixed under IKW-1232, which wraps the SDK's 23 socket listeners
     so a throwing handler never reaches the event thread. Expected as a patch release
-    after `2.28.0`. Two consequences reach us and both are already handled: a terminal
-    message that fails to parse ends the operation with no `failureReason` (our result
-    reader omits null keys, and a test asserts it), and a non-terminal failure leaves
-    the operation genuinely in flight with the payer's only exit being to cancel.
+    after `2.28.0`. That stops the crash, not the hang: **a terminal message that fails
+    to parse does not end the operation either** — it leaves the call in flight
+    indefinitely, the same as a non-terminal failure like `FORM_REQUEST`. Verified
+    directly against `khipu-client-android 2.28.3` source: `operationFinished`
+    (`KhipuActivity.kt:307`, `:588`) only gates the socket connection and a snackbar,
+    never a return to the host app; `buildResult(...)` runs exactly once (`:318`),
+    inside `if (khipuUiState.returnToApp)`; and every `returnToApp()` call site is
+    either a payer action (the cancel dialog at `:232`, the manual-transfer path at
+    `:328`) or sits inside `operationSuccess?.let`, `operationFailure?.let` or
+    `operationWarning?.let` (`:445`, `:458`, `:491`) — all null, and so skipped, when
+    deserialisation failed. There is no inactivity timer, in `2.28.3` exactly as in
+    `2.28.1`. The only recoveries are the payer pressing back and confirming the cancel
+    dialog, or this plugin's bridge clearing `savedCalls` on a WebView navigation. What
+    the `2.28.1`/`2.28.3` bump actually buys is that before `2.28.1` this reached
+    socket.io's `EventThread` uncaught and killed the merchant's process; now it only
+    hangs the call — a real improvement, just not the one this document used to claim.
   - _The deserialisation itself_ is not hardened. Verified against protocol `1.0.60`:
     `forValue` declares `throws IOException`, there is `@JsonValue` and `@JsonCreator`
     but no `@JsonEnumDefaultValue`, the converter configures only
