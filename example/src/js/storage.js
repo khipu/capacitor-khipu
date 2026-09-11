@@ -1,10 +1,10 @@
 const STORAGE_KEY = 'capacitor-khipu-harness';
 
 /**
- * El estado guardado puede venir de una versión anterior del harness, con menos
- * campos o con campos que ya no existen. Se toma la forma de `fallback` como
- * autoridad y solo se copian los valores de claves conocidas, para que agregar un
- * flag no rompa la sesión guardada.
+ * The saved state can come from an earlier version of the harness, with fewer
+ * fields or with fields that no longer exist. The shape of `fallback` is taken as
+ * the authority, and only the values of known keys are copied over, so adding a
+ * flag does not break the saved session.
  */
 function merge(fallback, stored) {
   const state = JSON.parse(JSON.stringify(fallback));
@@ -52,6 +52,6 @@ export function saveState(state) {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // Sin persistencia el harness sigue funcionando; no vale la pena interrumpir.
+    // Without persistence the harness still works; not worth interrupting for.
   }
 }

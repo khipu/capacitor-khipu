@@ -56,16 +56,16 @@ public class KhipuPlugin: CAPPlugin, CAPBridgedPlugin {
 
     }
 
-    /// Devuelve el controlador que está efectivamente arriba, siguiendo la cadena de
-    /// presentación desde el que da el puente.
+    /// Returns the controller that is actually on top, following the presentation chain
+    /// from the one the bridge gives us.
     ///
-    /// UIKit rechaza presentar sobre un controlador que ya está presentando, así que
-    /// sin esto el pago no aparece cuando el comercio tiene su propio modal en
-    /// pantalla.
+    /// UIKit refuses to present over a controller that is already presenting, so
+    /// without this the payment sheet does not show up when the merchant has their own
+    /// modal on screen.
     ///
-    /// Deliberadamente NO es una extensión de `UIViewController`: el plugin se enlaza
-    /// estáticamente en la app del comercio, y un nombre como `topMostViewController`
-    /// inyectado ahí puede chocar con el suyo.
+    /// Deliberately NOT a `UIViewController` extension: the plugin links statically
+    /// into the merchant's app, and a name like `topMostViewController` injected there
+    /// could collide with theirs.
     static func topMost(from controller: UIViewController) -> UIViewController {
         var top = controller
         while let presented = top.presentedViewController {
