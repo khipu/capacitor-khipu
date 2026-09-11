@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Falla si la versión de KhipuClientIOS declarada en `Package.swift` no coincide
- * con la del podspec.
+ * Fails if the KhipuClientIOS version declared in `Package.swift` does not match the
+ * one in the podspec.
  *
- * Mantener CocoaPods y SPM en paralelo implica que la versión del SDK nativo vive
- * en dos archivos. Un comercio que instala por CocoaPods y otro que instala por
- * SPM de la misma versión del plugin tienen que resolver el mismo grafo nativo.
+ * Keeping CocoaPods and SPM in parallel means the native SDK version lives in two
+ * files. A merchant who installs via CocoaPods and one who installs via SPM, both on
+ * the same plugin version, have to resolve the same native graph.
  *
- * Acepta las dos rutas por argumento para poder testearlo con fixtures.
+ * Accepts both paths as arguments so this can be tested with fixtures.
  */
 import { readFileSync } from 'node:fs';
 
@@ -17,7 +17,7 @@ const [packageSwiftPath = 'Package.swift', podspecPath = 'CapacitorKhipu.podspec
 function extract(path, pattern) {
   const match = readFileSync(path, 'utf8').match(pattern);
   if (!match) {
-    console.error(`No se encontró la versión de KhipuClientIOS en ${path}`);
+    console.error(`KhipuClientIOS version not found in ${path}`);
     process.exit(1);
   }
   return match[1];
@@ -28,9 +28,9 @@ const pod = extract(podspecPath, /s\.dependency\s+'KhipuClientIOS',\s*'([^']+)'/
 
 if (spm !== pod) {
   console.error(
-    `KhipuClientIOS desincronizado:\n  ${packageSwiftPath}: ${spm}\n  ${podspecPath}: ${pod}`,
+    `KhipuClientIOS out of sync:\n  ${packageSwiftPath}: ${spm}\n  ${podspecPath}: ${pod}`,
   );
   process.exit(1);
 }
 
-console.log(`KhipuClientIOS sincronizado en ${spm}`);
+console.log(`KhipuClientIOS in sync at ${spm}`);

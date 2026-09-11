@@ -1,12 +1,12 @@
 import Foundation
 import KhipuClientIOS
 
-/// Representación intermedia e inspeccionable de las opciones que llegan desde JS.
+/// Intermediate, inspectable representation of the options coming in from JS.
 ///
-/// Existe por una restricción del SDK: las propiedades de `KhipuOptions` y de
-/// `KhipuColors` son internas a `KhipuClientIOS`, así que desde este módulo no se
-/// pueden leer y no habría forma de testear el mapeo asertando sobre el objeto ya
-/// construido.
+/// It exists because of an SDK constraint: the properties of `KhipuOptions` and
+/// `KhipuColors` are internal to `KhipuClientIOS`, so they cannot be read from this
+/// module, and there would be no way to test the mapping by asserting on the
+/// already-built object.
 struct KhipuOptionsDraft: Equatable {
     var topBarTitle: String?
     var topBarImageUrl: String?

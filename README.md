@@ -30,24 +30,31 @@ only allows an app to check whether it can open another app's URL scheme
 returns `false`, the SDK silently skips opening the bank app **without raising any
 error**, and the two-factor authorization step simply never happens.
 
-Add `LSApplicationQueriesSchemes` to your app's `Info.plist`:
+Add `LSApplicationQueriesSchemes` to your app's `Info.plist`, at `ios/App/App/Info.plist`
+in a standard Capacitor project. It is a top-level key inside the root `<dict>`,
+alongside the keys Capacitor already put there:
 
 ```xml
-<key>LSApplicationQueriesSchemes</key>
-<array>
-  <string>bancochilemipass2</string>
-  <string>BciPassApp</string>
-  <string>BICEPassApp</string>
-  <string>scotiabankgo</string>
-  <string>SantanderPassApp</string>
-  <string>tupass</string>
-  <string>bancoestado</string>
-  <string>itau.cl</string>
-  <string>SecurityPass</string>
-</array>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>LSApplicationQueriesSchemes</key>
+  <array>
+    <string>bancochilemipass2</string>
+    <string>BciPassApp</string>
+    <string>BICEPassApp</string>
+    <string>scotiabankgo</string>
+    <string>SantanderPassApp</string>
+    <string>tupass</string>
+    <string>bancoestado</string>
+    <string>itau.cl</string>
+    <string>SecurityPass</string>
+  </array>
+  <!-- ...the rest of Capacitor's own keys (CFBundleName, UILaunchStoryboardName, etc.)... -->
+</dict>
+</plist>
 ```
-
-This is already applied as a reference in `example/ios/App/App/Info.plist`.
 
 ## Android setup
 
@@ -110,7 +117,16 @@ even configure, failing with `Unknown Kotlin JVM target: 21`.
 
 ## Usage
 
-The plugin exports a single object, `Khipu`:
+The plugin exports a single object, `Khipu`. The only thing you have to pass is the
+operation id:
+
+```typescript
+import { Khipu } from 'capacitor-khipu';
+
+const result = await Khipu.startOperation({ operationId: '<the operation id>' });
+```
+
+To customize the presentation, pass `options`:
 
 ```typescript
 import { Khipu } from 'capacitor-khipu';
@@ -138,6 +154,40 @@ unless you send `locale` explicitly.
 
 `result.exitUrl` can come back empty on real payments, so check it before using it.
 
+## Behaviour changes in 4.1.0
+
+- **Android now refuses a second, concurrent `startOperation` call instead of hanging
+  forever**, rejecting it with `'OPERATION_IN_PROGRESS'`. **iOS and web do not currently
+  guard against this: a second call proceeds** — iOS opens another payment flow, and web
+  re-mounts into the same root. If your app could call `startOperation` twice before the
+  first call resolves, add handling for the Android rejection, and on iOS and web avoid
+  triggering the second call from your own code until this is addressed. Error codes are
+  Android-only (`'INVALID_OPTIONS'`, `'OPERATION_IN_PROGRESS'`, `'LAUNCH_FAILED'`,
+  `'NO_RESULT'`), and only `'OPERATION_IN_PROGRESS'` signals this concurrency rejection —
+  the other three come from unrelated failures (bad options, the native activity failing
+  to launch, or returning with no result). iOS rejects without a code and web rejects a
+  bare `Error`, so don't branch on `error.code` cross-platform.
+- **An absent `theme` on web now follows the device's own setting**, matching iOS and
+  Android, instead of always falling back to light. If your web users are on a device
+  set to dark mode and you did not send `theme` explicitly, the payment screen now
+  renders differently than it did before.
+- **On iOS, a payer who denies the location permission no longer has the operation
+  ended and returned to your app.** The payment now continues instead, matching
+  Android's existing behaviour. If you relied on that denial ending the flow early on
+  iOS — for example treating "returned unexpectedly" as an implicit cancellation — that
+  no longer happens: expect the operation to keep running to a normal result instead of
+  an early return.
+- **The `null`-vs-omitted-key split on absent result fields is no longer a rare edge.**
+  Both native SDKs now hit it on the same ordinary path: a terminal protocol message
+  neither can decode, which Android `2.28.4` and iOS `2.17.1` each stop mislabeling and
+  instead leave unset — and "unset" still means something different per platform (see
+  `docs/STATUS.md`, "Known pending"). For that same event, `'failureReason' in result`
+  is `true` on iOS and `false` on Android, and `result.failureReason === null` is `true`
+  on iOS and `false` on Android too — a check meaning "this field is absent" is
+  reasonable either way you write it, and wrong on one of the two platforms. Compare
+  with truthiness (`if (result.failureReason)`) or `??`, not `in`, `=== null`, or
+  `=== undefined`.
+
 ## API
 
 <docgen-index>
@@ -150,11 +200,36 @@ unless you send `locale` explicitly.
 <docgen-api>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
 
+The plugin's single entry point: opens the Khipu payment flow and waits for it to
+finish.
+
 ### startOperation(...)
 
 ```typescript
 startOperation(options: StartOperationOptions) => Promise<KhipuResult>
 ```
+
+Opens the Khipu payment flow for an operation you already created through the
+Khipu API, and resolves once the flow finishes.
+
+A user who abandons the payment still resolves this promise: it comes back as
+`result: 'OK'`, `'ERROR'`, `'WARNING'` or `'CONTINUE'` in every case. See
+`KhipuResult.result` for what abandonment looks like.
+
+Android refuses a second, concurrent call while the first is genuinely still in
+flight, rejecting it with `'OPERATION_IN_PROGRESS'` instead of hanging or replacing
+the first one — the first operation's screen is still on screen and will still
+deliver a result to it, which could be a payment that went through. iOS and web do
+not currently guard against this: a second call proceeds, opening another payment
+flow on iOS or re-mounting into the same root on web.
+
+Error codes are Android-only, from `KhipuPlugin.java`, and only
+`'OPERATION_IN_PROGRESS'` signals this concurrency rejection. The other three come
+from unrelated paths: `'INVALID_OPTIONS'` from a missing `operationId` or an
+unreadable `options` object, `'LAUNCH_FAILED'` from the native activity failing to
+launch, and `'NO_RESULT'` from the activity returning with no result. iOS rejects
+with no code, and web rejects a bare `Error`. Do not write
+`e.code === 'OPERATION_IN_PROGRESS'` and expect it to work on every platform.
 
 | Param         | Type                                                                    |
 | ------------- | ----------------------------------------------------------------------- |
@@ -170,66 +245,81 @@ startOperation(options: StartOperationOptions) => Promise<KhipuResult>
 
 #### KhipuResult
 
-| Prop                | Type                                                    |
-| ------------------- | ------------------------------------------------------- |
-| **`operationId`**   | <code>string</code>                                     |
-| **`exitTitle`**     | <code>string</code>                                     |
-| **`exitMessage`**   | <code>string</code>                                     |
-| **`exitUrl`**       | <code>string</code>                                     |
-| **`result`**        | <code>'OK' \| 'ERROR' \| 'WARNING' \| 'CONTINUE'</code> |
-| **`failureReason`** | <code>string</code>                                     |
-| **`continueUrl`**   | <code>string</code>                                     |
-| **`events`**        | <code>KhipuEvent[]</code>                               |
+| Prop                | Type                                                    | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`operationId`**   | <code>string</code>                                     | The operation id that was passed to `startOperation`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **`exitTitle`**     | <code>string</code>                                     | Title of the closing screen the SDK already showed the payer (success, failure, warning, or continue). Confirmed on iOS, Android and web: all three set it from the same title the SDK's own screen displayed. Reuse it if you render your own screen instead of the SDK's.                                                                                                                                                                                                                                                                                                                                                     |
+| **`exitMessage`**   | <code>string</code>                                     | Body text of the closing screen the SDK already showed the payer, paired with `exitTitle`. Confirmed on iOS, Android and web. Reuse it if you render your own screen instead of the SDK's.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **`exitUrl`**       | <code>string</code>                                     | URL associated with the exit screen. Can come back empty on real payments, so check it before using it. When absent, iOS sends it as JSON `null` while Android omits the key entirely — both are valid under how each platform's bridge serialises a nil/absent optional. Aligning the two is under consideration, not decided: it would most likely mean changing iOS to omit the key like Android, which is a breaking change for existing iOS merchants and would need a major version (see `docs/STATUS.md`, "Known pending"). Compare with truthiness or `??`, not `=== undefined`, so it reads the same either way today. |
+| **`result`**        | <code>'OK' \| 'ERROR' \| 'WARNING' \| 'CONTINUE'</code> | Outcome of the operation. A user who abandons the payment arrives here as `'ERROR'` with `failureReason: 'USER_CANCELED'` — not as a rejected promise.                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **`failureReason`** | <code>string</code>                                     | Machine-readable reason behind the current `result`, straight from the Khipu protocol. Treat it as an open-ended string, not a fixed list: the protocol adds values over time — `USER_DISCONNECTED` is a recent one — and a hardcoded list here would go stale silently. When absent, iOS sends it as JSON `null` while Android omits the key entirely. Compare with truthiness or `??`, not `=== undefined`.                                                                                                                                                                                                                   |
+| **`continueUrl`**   | <code>string</code>                                     | URL to send the payer to so they can finish the operation. Present when, and only when, `result` is `'CONTINUE'` — confirmed on iOS, Android and web, where every other outcome branch leaves it `undefined`/`nil`. Undefined for every other `result` value. When absent, iOS sends it as JSON `null` while Android omits the key entirely. Compare with truthiness or `??`, not `=== undefined`.                                                                                                                                                                                                                              |
+| **`events`**        | <code>KhipuEvent[]</code>                               | Events recorded during the operation, in the order the SDK reported them.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 
 #### KhipuEvent
 
-| Prop            | Type                |
-| --------------- | ------------------- |
-| **`name`**      | <code>string</code> |
-| **`timestamp`** | <code>string</code> |
-| **`type`**      | <code>string</code> |
+| Prop            | Type                | Description                                             |
+| --------------- | ------------------- | ------------------------------------------------------- |
+| **`name`**      | <code>string</code> | Name of the event, as reported by the native SDK.       |
+| **`timestamp`** | <code>string</code> | When the event occurred, as reported by the native SDK. |
+| **`type`**      | <code>string</code> | Category of the event, as reported by the native SDK.   |
 
 
 #### StartOperationOptions
 
-| Prop              | Type                                                  |
-| ----------------- | ----------------------------------------------------- |
-| **`operationId`** | <code>string</code>                                   |
-| **`options`**     | <code><a href="#khipuoptions">KhipuOptions</a></code> |
+| Prop              | Type                                                  | Description                                                                                                                                                                                                                                |
+| ----------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`operationId`** | <code>string</code>                                   | The operation id returned by the Khipu API when you created the payment.                                                                                                                                                                   |
+| **`options`**     | <code><a href="#khipuoptions">KhipuOptions</a></code> | Presentation options. Every key is optional, and leaving one out is not the same as sending it: an absent key lets the native SDK apply its own default. The whole object can be left out too; that is equivalent to sending an empty one. |
 
 
 #### KhipuOptions
 
-| Prop                      | Type                                                |
-| ------------------------- | --------------------------------------------------- |
-| **`locale`**              | <code>string</code>                                 |
-| **`title`**               | <code>string</code>                                 |
-| **`titleImageUrl`**       | <code>string</code>                                 |
-| **`skipExitPage`**        | <code>boolean</code>                                |
-| **`skipExitSuccessPage`** | <code>boolean</code>                                |
-| **`theme`**               | <code>'light' \| 'dark' \| 'system'</code>          |
-| **`colors`**              | <code><a href="#khipucolors">KhipuColors</a></code> |
-| **`showFooter`**          | <code>boolean</code>                                |
-| **`showMerchantLogo`**    | <code>boolean</code>                                |
-| **`showPaymentDetails`**  | <code>boolean</code>                                |
+Presentation options for the payment screen. Every field is optional, and an absent
+field is not the same as sending one: leaving a key out lets the platform apply its
+own default instead of overriding it.
+
+Web is more limited than the native SDKs: see each field below for whether web
+reads it.
+
+| Prop                      | Type                                                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`locale`**              | <code>string</code>                                 | BCP 47-ish locale for the payment screen, e.g. `es_CL`. The two native SDKs disagree on the default: iOS falls back to `es_CL` while Android follows the phone's language. Send it explicitly if you need the same language on both.                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **`title`**               | <code>string</code>                                 | Title shown on the payment screen in place of the SDK's own default. Native only. The web loader does not read this key.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **`titleImageUrl`**       | <code>string</code>                                 | URL of an image shown alongside the title. Native only. The web loader does not read this key.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **`skipExitPage`**        | <code>boolean</code>                                | Skips the exit page normally shown at the end of the flow, whatever the outcome. Honored on web as well as on both native platforms.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **`skipExitSuccessPage`** | <code>boolean</code>                                | Skips the success page at the end of the flow. Native only for now. The deployed web loader does not read this key yet; it is sent so it starts working when a later version does.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **`theme`**               | <code>'light' \| 'dark' \| 'system'</code>          | Color scheme for the payment screen. Leaving this out follows the device's own setting on all three platforms — the same as sending `'system'` explicitly. Say so plainly because it was not always true: web used to default to light regardless of the device, so the same payment could render light on web and dark on the phone with nothing in the merchant's code to explain it. On web, `'system'` is resolved locally via `prefers-color-scheme`, and the result then picks between `colors.lightPrimary` and `colors.darkPrimary` — the only two color overrides web applies. See <a href="#khipucolors">`KhipuColors`</a>. |
+| **`colors`**              | <code><a href="#khipucolors">KhipuColors</a></code> | Color overrides for the payment screen, kept as separate light and dark palettes. Web only reads `lightPrimary` and `darkPrimary`; the other ten fields reach both native SDKs but have no effect on web.                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **`showFooter`**          | <code>boolean</code>                                | Shows or hides the footer on the payment screen. Native only. The web loader does not read this key.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **`showMerchantLogo`**    | <code>boolean</code>                                | Shows or hides the merchant logo on the payment screen. Native only. The web loader does not read this key.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **`showPaymentDetails`**  | <code>boolean</code>                                | Shows or hides the payment details on the payment screen. Native only. The web loader does not read this key.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 
 #### KhipuColors
 
-| Prop                         | Type                |
-| ---------------------------- | ------------------- |
-| **`lightBackground`**        | <code>string</code> |
-| **`lightOnBackground`**      | <code>string</code> |
-| **`lightPrimary`**           | <code>string</code> |
-| **`lightOnPrimary`**         | <code>string</code> |
-| **`lightTopBarContainer`**   | <code>string</code> |
-| **`lightOnTopBarContainer`** | <code>string</code> |
-| **`darkBackground`**         | <code>string</code> |
-| **`darkOnBackground`**       | <code>string</code> |
-| **`darkPrimary`**            | <code>string</code> |
-| **`darkOnPrimary`**          | <code>string</code> |
-| **`darkTopBarContainer`**    | <code>string</code> |
-| **`darkOnTopBarContainer`**  | <code>string</code> |
+Color overrides for the payment screen, as two parallel palettes: `light*` fields
+apply in light mode, `dark*` fields in dark mode. Each value is a color understood
+by the native SDK you are targeting.
+
+Web only reads `lightPrimary` and `darkPrimary` — see <a href="#khipuoptions">`KhipuOptions.theme`</a> for how
+it picks between them. The other ten fields reach the native SDKs but have no
+effect on web.
+
+| Prop                         | Type                | Description                                                                                                                                          |
+| ---------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`lightBackground`**        | <code>string</code> | Background color in light mode. Native only. The web loader does not read this key.                                                                  |
+| **`lightOnBackground`**      | <code>string</code> | Color for content drawn over `lightBackground`. Native only. The web loader does not read this key.                                                  |
+| **`lightPrimary`**           | <code>string</code> | Primary/accent color in light mode. Honored on web: applied when the resolved theme (see <a href="#khipuoptions">`KhipuOptions.theme`</a>) is light. |
+| **`lightOnPrimary`**         | <code>string</code> | Color for content drawn over `lightPrimary`. Native only. The web loader does not read this key.                                                     |
+| **`lightTopBarContainer`**   | <code>string</code> | Top bar background color in light mode. Native only. The web loader does not read this key.                                                          |
+| **`lightOnTopBarContainer`** | <code>string</code> | Color for content drawn over `lightTopBarContainer`. Native only. The web loader does not read this key.                                             |
+| **`darkBackground`**         | <code>string</code> | Background color in dark mode. Native only. The web loader does not read this key.                                                                   |
+| **`darkOnBackground`**       | <code>string</code> | Color for content drawn over `darkBackground`. Native only. The web loader does not read this key.                                                   |
+| **`darkPrimary`**            | <code>string</code> | Primary/accent color in dark mode. Honored on web: applied when the resolved theme (see <a href="#khipuoptions">`KhipuOptions.theme`</a>) is dark.   |
+| **`darkOnPrimary`**          | <code>string</code> | Color for content drawn over `darkPrimary`. Native only. The web loader does not read this key.                                                      |
+| **`darkTopBarContainer`**    | <code>string</code> | Top bar background color in dark mode. Native only. The web loader does not read this key.                                                           |
+| **`darkOnTopBarContainer`**  | <code>string</code> | Color for content drawn over `darkTopBarContainer`. Native only. The web loader does not read this key.                                              |
 
 </docgen-api>

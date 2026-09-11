@@ -9,21 +9,21 @@ describe('renderResult', () => {
     container = document.createElement('div');
   });
 
-  it('muestra los campos del resultado', () => {
+  it('shows the result fields', () => {
     renderResult(container, {
       operationId: 'abc123',
-      exitTitle: 'Listo',
-      exitMessage: 'Pago realizado',
+      exitTitle: 'Done',
+      exitMessage: 'Payment completed',
       result: 'OK',
       events: [],
     });
 
     expect(container.textContent).toContain('abc123');
-    expect(container.textContent).toContain('Pago realizado');
+    expect(container.textContent).toContain('Payment completed');
     expect(container.querySelector('.result-OK')).not.toBeNull();
   });
 
-  it('lista los eventos en una tabla', () => {
+  it('lists the events in a table', () => {
     renderResult(container, {
       operationId: 'abc123',
       result: 'OK',
@@ -36,16 +36,16 @@ describe('renderResult', () => {
     expect(container.querySelectorAll('tbody tr')).toHaveLength(2);
   });
 
-  it('no rompe si faltan campos opcionales', () => {
+  it('does not break if optional fields are missing', () => {
     renderResult(container, { operationId: 'abc123', result: 'ERROR' });
 
     expect(container.textContent).toContain('abc123');
     expect(container.querySelectorAll('tbody tr')).toHaveLength(0);
   });
 
-  it('renderError muestra el mensaje', () => {
-    renderError(container, new Error('el puente no respondió'));
+  it('renderError shows the message', () => {
+    renderError(container, new Error('the bridge did not respond'));
 
-    expect(container.textContent).toContain('el puente no respondió');
+    expect(container.textContent).toContain('the bridge did not respond');
   });
 });

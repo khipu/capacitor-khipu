@@ -1,10 +1,9 @@
 /**
- * Construye el payload de `Khipu.startOperation` a partir del estado del
- * formulario.
+ * Builds the `Khipu.startOperation` payload from the form's state.
  *
- * El plugin distingue "clave ausente" de `false`, así que cada campo lleva su
- * propio `include` y aquí solo se agregan los marcados. Un campo sin marcar deja
- * que el SDK nativo aplique su valor por omisión.
+ * The plugin distinguishes "key absent" from `false`, so each field carries its
+ * own `include` flag and only the marked ones get added here. An unmarked field
+ * lets the native SDK apply its default value.
  */
 export function buildPayload(state) {
   const options = {};

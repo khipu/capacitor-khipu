@@ -30,21 +30,21 @@ function run(args) {
 }
 
 describe('check-native-versions', () => {
-  it('pasa cuando las dos versiones coinciden', () => {
+  it('passes when both versions match', () => {
     const result = run(fixtures('2.16.5', '2.16.5'));
 
     expect(result.code).toBe(0);
     expect(result.output).toContain('2.16.5');
   });
 
-  it('falla cuando las versiones difieren', () => {
+  it('fails when the versions differ', () => {
     const result = run(fixtures('2.16.5', '2.16.2'));
 
     expect(result.code).toBe(1);
-    expect(result.output).toContain('desincronizado');
+    expect(result.output).toContain('out of sync');
   });
 
-  it('falla cuando no encuentra la versión en Package.swift', () => {
+  it('fails when it cannot find the version in Package.swift', () => {
     const [, podspec] = fixtures('2.16.5', '2.16.5');
     const dir = mkdtempSync(join(tmpdir(), 'khipu-versions-'));
     const packageSwift = join(dir, 'Package.swift');
@@ -53,10 +53,10 @@ describe('check-native-versions', () => {
     const result = run([packageSwift, podspec]);
 
     expect(result.code).toBe(1);
-    expect(result.output).toContain('No se encontró');
+    expect(result.output).toContain('not found');
   });
 
-  it('con los archivos reales del repo las versiones están sincronizadas', () => {
+  it("with the repo's real files the versions are in sync", () => {
     expect(run([]).code).toBe(0);
   });
 });

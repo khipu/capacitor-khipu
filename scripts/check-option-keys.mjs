@@ -1,117 +1,177 @@
 #!/usr/bin/env node
 /**
- * Falla si las cuatro superficies que declaran el vocabulario de opciones dejan de
- * coincidir.
+ * Fails if any of the six surfaces that carry this plugin's option and result
+ * vocabulary stop matching the contract in `src/definitions.ts`.
  *
- * El contrato entre JS y el nativo es de strings: `src/definitions.ts` lo declara, el
- * mapper de Swift y el plugin de Java lo leen, y el harness lo ofrece. Renombrar una
- * clave en una sola superficie deja el flag sin efecto **en silencio** — ningún test de
- * un lado puede detectar una deriva del otro.
+ * The contract between JS and native is made of strings: `src/definitions.ts` declares
+ * it, the Swift mapper and the Java mapper read it, and the harness offers it. Renaming
+ * a key on just one surface leaves the flag with no effect **silently** — no test on
+ * either side can detect the other one drifting.
  *
- * También cubre el camino de vuelta (nativo → JS): las 8 claves con las que
- * `KhipuPlugin.swift` arma la promesa vía `call.resolve([...])`, contra la interfaz
- * `KhipuResult`. Android queda fuera de esta mitad: `KhipuPlugin.java` delega la forma
- * entera del resultado al SDK (`khipuResult.asJson()`), así que sus claves no están en
- * nuestro fuente y no se pueden extraer. Esa mitad se verifica a mano, comparando los
- * campos que muestra el harness al correr la misma operación en iOS y en Android.
+ * `src/web.ts` is a fourth surface for the options vocabulary, and the one drift is
+ * otherwise invisible on: no test compares it to the contract, and nothing else reads
+ * it. Its options and colours must partition into exactly two sets — read by the web
+ * layer, or declared in `WEB_UNSUPPORTED`/`WEB_UNSUPPORTED_COLORS` — never both, never
+ * neither, so a new contract key forces someone to decide what web does with it instead
+ * of letting it be silently dropped. The fifth and sixth surfaces are the result
+ * direction, below.
  *
- * Sobre la fragilidad: esto parsea fuente con expresiones regulares. La dirección del
- * fallo es la correcta (el chequeo se rompe y alguien mira, en vez de pasar mientras el
- * protocolo derivó), pero un parser roto podría reportar «todas coinciden» con cero
- * claves en todas. Por eso hay un piso de cordura: si la extracción del contrato
- * devuelve menos claves de las que debería, el problema es el parser y se dice así.
+ * It also covers the way back (native → JS), on both platforms: the 8 keys with which
+ * `KhipuPlugin.swift` builds the promise via `call.resolve([...])`, and the 8 keys with
+ * which `KhipuResultReader.java` builds the same object via `put(result, "<key>", ...)`,
+ * each checked against the `KhipuResult` interface. Android used to be exempt from this
+ * half: it delegated the entire shape of the result to the SDK (`khipuResult.asJson()`),
+ * which put the field names out of our source and out of this guard's reach. It now
+ * builds the result key by key instead, for exactly this reason, so both halves of the
+ * return path are covered the same way as the outbound one.
+ *
+ * On fragility: this parses source with regular expressions. The failure direction is
+ * the right one (the check breaks and someone looks, instead of passing while the
+ * protocol has drifted), but a broken parser could report "everything matches" with
+ * zero keys everywhere. That's why there's a sanity floor: if contract extraction
+ * returns fewer keys than it should, the parser is the problem and it says so.
  */
 import { readFileSync } from 'node:fs';
 
-// Acepta un directorio base para poder testear con fixtures, igual que la guarda de
-// versiones acepta rutas por argv.
+// Accepts a base directory so this can be tested with fixtures, the same way the
+// versions guard accepts paths via argv.
 const BASE = process.argv[2] ?? '.';
-const CONTRATO = `${BASE}/src/definitions.ts`;
+const CONTRACT = `${BASE}/src/definitions.ts`;
 const SWIFT = `${BASE}/ios/Sources/KhipuPlugin/KhipuOptionsMapper.swift`;
-const JAVA = `${BASE}/android/src/main/java/com/khipu/capacitor/KhipuPlugin.java`;
+const MAPPER = `${BASE}/android/src/main/java/com/khipu/capacitor/KhipuOptionsMapper.java`;
 const HARNESS = `${BASE}/example/src/js/fields.js`;
 const PLUGIN = `${BASE}/ios/Sources/KhipuPlugin/KhipuPlugin.swift`;
+const READER = `${BASE}/android/src/main/java/com/khipu/capacitor/KhipuResultReader.java`;
+const WEB = `${BASE}/src/web.ts`;
 
-const leer = (path) => readFileSync(path, 'utf8');
-const claves = (fuente, patron) => new Set([...fuente.matchAll(patron)].map((m) => m[1]));
-const sinColors = (conjunto) => new Set([...conjunto].filter((k) => k !== 'colors'));
+const read = (path) => readFileSync(path, 'utf8');
+const keys = (source, pattern) => new Set([...source.matchAll(pattern)].map((m) => m[1]));
+const withoutColors = (set) => new Set([...set].filter((k) => k !== 'colors'));
 
-function interfaz(fuente, nombre) {
-  const bloque = fuente.match(new RegExp(`export interface ${nombre} \\{(.*?)\\n\\}`, 's'));
-  if (!bloque) {
-    console.error(
-      `No se pudo extraer la interfaz ${nombre} de ${CONTRATO}. El parser de esta guarda quedó obsoleto.`,
-    );
+function interfaceKeys(source, name) {
+  const block = source.match(new RegExp(`export interface ${name} \\{(.*?)\\n\\}`, 's'));
+  if (!block) {
+    console.error(`Could not extract interface ${name} from ${CONTRACT}. This guard's parser is out of date.`);
     process.exit(1);
   }
-  return claves(bloque[1], /^\s*(\w+)\s*[?:]/gm);
+  return keys(block[1], /^\s*(\w+)\s*[?:]/gm);
 }
 
-// Camino de vuelta (nativo → JS): las claves con las que iOS arma la promesa que
-// recibe el comercio. Android no es verificable de la misma forma porque delega la
-// forma entera del resultado al SDK (`khipuResult.asJson()`), así que esa mitad se
-// cubre a mano comparando el harness en las dos plataformas.
-function clavesDeResolve(fuente) {
-  const bloque = fuente.match(/call\.resolve\(\[(.*?)\]\)/s);
-  if (!bloque) {
-    console.error(
-      `No se pudo extraer el bloque \`call.resolve\` de ${PLUGIN}. El parser de esta guarda quedó obsoleto.`,
-    );
+// The way back (native → JS): the keys with which iOS builds the promise the merchant
+// receives. Android's counterpart is `KhipuResultReader.java`, checked separately below
+// via its own `put(result, "<key>", ...)` calls.
+function resolveKeys(source) {
+  const block = source.match(/call\.resolve\(\[(.*?)\]\)/s);
+  if (!block) {
+    console.error(`Could not extract the \`call.resolve\` block from ${PLUGIN}. This guard's parser is out of date.`);
     process.exit(1);
   }
-  return claves(bloque[1], /"(\w+)":/g);
+  return keys(block[1], /"(\w+)":/g);
 }
 
-const contrato = leer(CONTRATO);
-const opciones = sinColors(interfaz(contrato, 'KhipuOptions'));
-const colores = interfaz(contrato, 'KhipuColors');
-const resultado = interfaz(contrato, 'KhipuResult');
+/** Keys inside an exported array literal, e.g. `export const WEB_UNSUPPORTED = [...]`. */
+function listed(source, name) {
+  const block = source.match(new RegExp(`export const ${name}[^=]*=\\s*\\[(.*?)\\]`, 's'));
+  if (!block) {
+    console.error(`Could not extract ${name} from ${WEB}. This guard's parser is out of date.`);
+    process.exit(1);
+  }
+  return keys(block[1], /'(\w+)'/g);
+}
 
-// Piso de cordura: si el contrato se lee casi vacío, lo roto es el parser, no el código.
-if (opciones.size < 5 || colores.size < 8 || resultado.size < 5) {
+const contract = read(CONTRACT);
+const options = withoutColors(interfaceKeys(contract, 'KhipuOptions'));
+const colors = interfaceKeys(contract, 'KhipuColors');
+const result = interfaceKeys(contract, 'KhipuResult');
+
+// Sanity floor: if the contract reads back nearly empty, the parser is broken, not the code.
+if (options.size < 5 || colors.size < 8 || result.size < 5) {
   console.error(
-    `La extracción del contrato devolvió ${opciones.size} opciones, ${colores.size} colores y ` +
-      `${resultado.size} campos de resultado, muy pocas para ser real. El parser de esta guarda ` +
-      `quedó obsoleto: arréglalo en vez de confiar en que las superficies coinciden.`,
+    `Contract extraction returned ${options.size} options, ${colors.size} colors and ` +
+      `${result.size} result fields — too few to be real. This guard's parser is out of ` +
+      `date: fix it instead of trusting that the surfaces match.`,
   );
   process.exit(1);
 }
 
-const swift = leer(SWIFT);
-const java = leer(JAVA);
-const tramos = leer(HARNESS).split('export const COLOR_FIELDS');
+const swift = read(SWIFT);
+const mapper = read(MAPPER);
+const sections = read(HARNESS).split('export const COLOR_FIELDS');
 
-const superficies = [
-  { nombre: `${SWIFT} (opciones)`, esperado: opciones, real: sinColors(claves(swift, /options\["(\w+)"\]/g)) },
-  { nombre: `${SWIFT} (colores)`, esperado: colores, real: claves(swift, /colors\["(\w+)"\]/g) },
-  { nombre: `${JAVA} (opciones)`, esperado: opciones, real: sinColors(claves(java, /options\.\w+\("(\w+)"/g)) },
-  { nombre: `${JAVA} (colores)`, esperado: colores, real: claves(java, /colors\.\w+\("(\w+)"/g) },
-  { nombre: `${HARNESS} (opciones)`, esperado: opciones, real: claves(tramos[0], /key: '(\w+)'/g) },
+const web = read(WEB);
+const webUnsupported = listed(web, 'WEB_UNSUPPORTED');
+const webUnsupportedColors = listed(web, 'WEB_UNSUPPORTED_COLORS');
+const webReads = withoutColors(keys(web, /\bopts\.(\w+)/g));
+const webReadsColors = keys(web, /\bcolors\??\.(\w+)/g);
+
+// Sanity floor: the same failure mode as the contract's above. `listed()` already exits
+// loudly when it cannot find the array at all, but a reshaped array (different quoting,
+// a different literal shape) can match the outer regex and still yield zero keys. That
+// would make the partition below look "clean" — nothing read, nothing unsupported — for
+// the wrong reason.
+if (webUnsupported.size < 2 || webUnsupportedColors.size < 4) {
+  console.error(
+    `${WEB} extraction returned ${webUnsupported.size} unsupported options and ` +
+      `${webUnsupportedColors.size} unsupported colors — too few to be real. This guard's ` +
+      `parser is out of date: fix it instead of trusting that the surfaces match.`,
+  );
+  process.exit(1);
+}
+
+const surfaces = [
+  { name: `${SWIFT} (options)`, expected: options, actual: withoutColors(keys(swift, /options\["(\w+)"\]/g)) },
+  { name: `${SWIFT} (colors)`, expected: colors, actual: keys(swift, /colors\["(\w+)"\]/g) },
   {
-    nombre: `${HARNESS} (colores)`,
-    esperado: colores,
-    real: claves(tramos[1].split('export const PRESETS')[0], /key: '(\w+)'/g),
+    name: `${MAPPER} (options)`,
+    expected: options,
+    actual: withoutColors(keys(mapper, /\b(?:string|bool)\(options, "(\w+)"/g)),
   },
-  { nombre: `${PLUGIN} (resultado)`, esperado: resultado, real: clavesDeResolve(leer(PLUGIN)) },
+  { name: `${MAPPER} (colors)`, expected: colors, actual: keys(mapper, /\bstring\(colors, "(\w+)"/g) },
+  { name: `${HARNESS} (options)`, expected: options, actual: keys(sections[0], /key: '(\w+)'/g) },
+  {
+    name: `${HARNESS} (colors)`,
+    expected: colors,
+    actual: keys(sections[1].split('export const PRESETS')[0], /key: '(\w+)'/g),
+  },
+  { name: `${PLUGIN} (result)`, expected: result, actual: resolveKeys(read(PLUGIN)) },
+  { name: `${READER} (result)`, expected: result, actual: keys(read(READER), /\bput\(result, "(\w+)"/g) },
+  { name: `${WEB} (options)`, expected: options, actual: new Set([...webReads, ...webUnsupported]) },
+  { name: `${WEB} (colors)`, expected: colors, actual: new Set([...webReadsColors, ...webUnsupportedColors]) },
 ];
 
-let derivo = false;
-for (const { nombre, esperado, real } of superficies) {
-  const falta = [...esperado].filter((k) => !real.has(k));
-  const sobra = [...real].filter((k) => !esperado.has(k));
-  if (falta.length || sobra.length) {
-    derivo = true;
-    console.error(`${nombre} derivó del contrato de ${CONTRATO}:`);
-    if (falta.length) console.error(`  no lee/ofrece: ${falta.join(', ')}`);
-    if (sobra.length) console.error(`  lee/ofrece de más: ${sobra.join(', ')}`);
+let drifted = false;
+for (const { name, expected, actual } of surfaces) {
+  const missing = [...expected].filter((k) => !actual.has(k));
+  const extra = [...actual].filter((k) => !expected.has(k));
+  if (missing.length || extra.length) {
+    drifted = true;
+    console.error(`${name} drifted from the contract in ${CONTRACT}:`);
+    if (missing.length) console.error(`  does not read/offer: ${missing.join(', ')}`);
+    if (extra.length) console.error(`  reads/offers extra: ${extra.join(', ')}`);
   }
 }
 
-if (derivo) {
+// An option must be in exactly one of "read" or "declared unsupported" — never both.
+// Overlap is its own drift, distinct from the coverage check above: two sets can each
+// pass that check (nothing missing, nothing extra in the union) while still double
+// counting a key that both claim.
+for (const [label, reads, unsupported] of [
+  [`${WEB} (options)`, webReads, webUnsupported],
+  [`${WEB} (colors)`, webReadsColors, webUnsupportedColors],
+]) {
+  const both = [...reads].filter((k) => unsupported.has(k));
+  if (both.length) {
+    drifted = true;
+    console.error(`${label}: both read and listed as unsupported: ${both.join(', ')}`);
+  }
+}
+
+if (drifted) {
   process.exit(1);
 }
 
 console.log(
-  `Vocabulario sincronizado en las cuatro superficies: ${opciones.size} opciones, ${colores.size} colores, ` +
-    `y en el resultado que arma iOS: ${resultado.size} campos`,
+  `Vocabulary in sync across every surface: ${options.size} options, ${colors.size} colors, ` +
+    `${result.size} fields in the result both iOS and Android build, and on web ` +
+    `${webReads.size} options honoured with ${webUnsupported.size} declared unsupported`,
 );

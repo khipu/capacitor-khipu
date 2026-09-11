@@ -16,14 +16,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # No se usa `npm run lint`: encadena eslint && prettier --check && swiftlint,
-      # y el tercer tramo depende de un binario de macOS que este runner no tiene.
-      # Los dos primeros tramos corren acá por separado; swiftlint corre en el job ios.
+      # `npm run lint` is not used here: it chains eslint && prettier --check &&
+      # swiftlint, and the third stage depends on a macOS binary this runner does not
+      # have. The first two stages run here separately; swiftlint runs in the ios job.
       - run: npm run eslint
       - run: npm run prettier -- --check
       - run: npm test
       - run: npm run verify:versions
       - run: npm run verify:keys
+      - run: npm run verify:readme
       - run: npm run verify:web
 
   ios:
@@ -35,26 +36,26 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Cachear la resolución de SPM
+      - name: Cache the SPM resolution
         uses: actions/cache@v4
         with:
           path: .build
           key: spm-${{ runner.os }}-${{ hashFiles('Package.swift') }}
-      - name: Build del paquete
+      - name: Build the package
         run: xcodebuild build -scheme CapacitorKhipu -destination generic/platform=iOS
-      - name: Tests del paquete
+      - name: Test the package
         run: xcodebuild test -scheme CapacitorKhipu -destination 'platform=iOS Simulator,name=iPhone 16'
-      # Instalar SwiftLint y confirmar su presencia son dos steps a propósito:
-      # `npx node-swiftlint lint` sale con código 0 e imprime solo un warning cuando
-      # el binario no está en el PATH. Sin el `swiftlint version` previo, el step de
-      # lint pasaría en verde sin revisar una sola línea de Swift.
-      - name: Instalar SwiftLint
+      # Installing SwiftLint and confirming its presence are two steps on purpose:
+      # `npx node-swiftlint lint` exits with code 0 and prints only a warning when the
+      # binary is not on the PATH. Without the `swiftlint version` step before it, the
+      # lint step would pass green without reviewing a single line of Swift.
+      - name: Install SwiftLint
         run: brew list swiftlint || brew install swiftlint
-      - name: Confirmar que SwiftLint existe
+      - name: Confirm SwiftLint is present
         run: swiftlint version
-      - name: Lint de Swift
+      - name: Lint Swift
         run: npm run swiftlint -- lint
-      - name: Lint del podspec
+      - name: Lint the podspec
         run: pod lib lint --allow-warnings
 
   android:
@@ -65,19 +66,19 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      # gradle-wrapper.jar es un binario de ~43 KB que ningún diff deja inspeccionar.
-      # Esta action compara su checksum contra los oficiales de Gradle: es la única
-      # defensa contra un wrapper alterado.
-      - name: Validar el wrapper de Gradle
+      # gradle-wrapper.jar is a ~43 KB binary that no diff lets you inspect. This
+      # action compares its checksum against Gradle's official ones: it is the only
+      # defense against a tampered wrapper.
+      - name: Validate the Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
       - uses: android-actions/setup-android@v3
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      # android/settings.gradle incluye :capacitor-android desde
-      # ../node_modules/@capacitor/android/capacitor, así que node_modules debe
-      # existir antes de que Gradle resuelva el proyecto.
+      # android/settings.gradle includes :capacitor-android from
+      # ../node_modules/@capacitor/android/capacitor, so node_modules must exist
+      # before Gradle resolves the project.
       - run: npm ci
       - run: ./gradlew clean build test
         working-directory: android
@@ -87,18 +88,28 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Instalar la app de ejemplo
+      - name: Install the example app
         run: npm install
         working-directory: example
-      - name: Sincronizar y construir iOS
+      - name: Sync and build iOS
         run: |
           npm run build
           npx cap sync ios
           xcodebuild build -project ios/App/App.xcodeproj -scheme App -destination generic/platform=iOS CODE_SIGNING_ALLOWED=NO
         working-directory: example
+      - name: Sync Android
+        run: npx cap sync android
+        working-directory: example
+      - name: Build Android
+        run: ./gradlew assembleDebug
+        working-directory: example/android

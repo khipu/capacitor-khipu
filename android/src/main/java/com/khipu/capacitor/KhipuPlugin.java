@@ -3,6 +3,8 @@ package com.khipu.capacitor;
 import static com.khipu.client.KhipuKt.KHIPU_RESULT_EXTRA;
 import static com.khipu.client.KhipuKt.getKhipuLauncherIntent;
 
+import android.content.Intent;
+import android.os.Bundle;
 import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -10,123 +12,83 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import com.khipu.client.KhipuColors;
 import com.khipu.client.KhipuOptions;
-import com.khipu.client.KhipuResult;
-import java.util.Objects;
-import org.json.JSONException;
+import java.io.Serializable;
 
 @CapacitorPlugin(name = "Khipu")
 public class KhipuPlugin extends Plugin {
+
+    private final PendingCall pending = new PendingCall();
 
     @PluginMethod
     public void startOperation(PluginCall call) {
         String operationId = call.getString("operationId");
         if (operationId == null) {
-            call.reject("Must provide operationId");
+            call.reject("Must provide operationId", "INVALID_OPTIONS");
             return;
         }
-        KhipuOptions.Builder optionsBuilder = new KhipuOptions.Builder();
-        JSObject options = call.getObject("options", new JSObject());
 
-        assert options != null;
-        if (options.has("title")) {
-            optionsBuilder.topBarTitle(Objects.requireNonNull(options.getString("title")));
-        }
-        if (options.has("titleImageUrl")) {
-            optionsBuilder.topBarImageUrl(Objects.requireNonNull(options.getString("titleImageUrl")));
-        }
-        if (options.has("skipExitPage")) {
-            optionsBuilder.skipExitPage(Boolean.TRUE.equals(options.getBool("skipExitPage")));
-        }
-        if (options.has("skipExitSuccessPage")) {
-            optionsBuilder.skipExitSuccessPage(Boolean.TRUE.equals(options.getBool("skipExitSuccessPage")));
-        }
-        if (options.has("showFooter")) {
-            optionsBuilder.showFooter(Boolean.TRUE.equals(options.getBool("showFooter")));
-        }
-        if (options.has("showMerchantLogo")) {
-            optionsBuilder.showMerchantLogo(Boolean.TRUE.equals(options.getBool("showMerchantLogo")));
-        }
-        if (options.has("showPaymentDetails")) {
-            optionsBuilder.showPaymentDetails(Boolean.TRUE.equals(options.getBool("showPaymentDetails")));
-        }
-        if (options.has("locale")) {
-            optionsBuilder.locale(Objects.requireNonNull(options.getString("locale")));
-        }
-        if (options.has("theme")) {
-            String theme = options.getString("theme");
-            if ("light".equals(theme)) {
-                optionsBuilder.theme(KhipuOptions.Theme.LIGHT);
-            } else if ("dark".equals(theme)) {
-                optionsBuilder.theme(KhipuOptions.Theme.DARK);
-            } else if ("system".equals(theme)) {
-                optionsBuilder.theme(KhipuOptions.Theme.SYSTEM);
-            }
+        KhipuOptions options;
+        try {
+            // Backstop: Task 8 proved this mapper cannot throw on any merchant input
+            // against the current SDK version, but it calls a third-party Kotlin
+            // builder we do not control across versions. If it ever does throw here,
+            // uncaught, Capacitor rethrows it as a RuntimeException on the task
+            // handler and the promise never settles - the app very likely dies. This
+            // catch is cheap insurance against that, kept even though it is
+            // unreachable today.
+            options = KhipuOptionsMapper.map(call.getObject("options", new JSObject()));
+        } catch (RuntimeException e) {
+            call.reject("Could not read the options object", "INVALID_OPTIONS", e);
+            return;
         }
 
-        KhipuColors.Builder colorsBuilder = new KhipuColors.Builder();
-        if (options.has("colors")) {
-            JSObject colors = options.getJSObject("colors");
-            assert colors != null;
-            if (colors.has("lightBackground")) {
-                colorsBuilder.lightBackground(Objects.requireNonNull(colors.getString("lightBackground")));
-            }
-            if (colors.has("lightOnBackground")) {
-                colorsBuilder.lightOnBackground(Objects.requireNonNull(colors.getString("lightOnBackground")));
-            }
-            if (colors.has("lightPrimary")) {
-                colorsBuilder.lightPrimary(Objects.requireNonNull(colors.getString("lightPrimary")));
-            }
-            if (colors.has("lightOnPrimary")) {
-                colorsBuilder.lightOnPrimary(Objects.requireNonNull(colors.getString("lightOnPrimary")));
-            }
-            if (colors.has("lightTopBarContainer")) {
-                colorsBuilder.lightTopBarContainer(Objects.requireNonNull(colors.getString("lightTopBarContainer")));
-            }
-            if (colors.has("lightOnTopBarContainer")) {
-                colorsBuilder.lightOnTopBarContainer(Objects.requireNonNull(colors.getString("lightOnTopBarContainer")));
-            }
-            if (colors.has("darkBackground")) {
-                colorsBuilder.darkBackground(Objects.requireNonNull(colors.getString("darkBackground")));
-            }
-            if (colors.has("darkOnBackground")) {
-                colorsBuilder.darkOnBackground(Objects.requireNonNull(colors.getString("darkOnBackground")));
-            }
-            if (colors.has("darkPrimary")) {
-                colorsBuilder.darkPrimary(Objects.requireNonNull(colors.getString("darkPrimary")));
-            }
-            if (colors.has("darkOnPrimary")) {
-                colorsBuilder.darkOnPrimary(Objects.requireNonNull(colors.getString("darkOnPrimary")));
-            }
-            if (colors.has("darkTopBarContainer")) {
-                colorsBuilder.darkTopBarContainer(Objects.requireNonNull(colors.getString("darkTopBarContainer")));
-            }
-            if (colors.has("darkOnTopBarContainer")) {
-                colorsBuilder.darkOnTopBarContainer(Objects.requireNonNull(colors.getString("darkOnTopBarContainer")));
-            }
+        // Rejected, not superseded: the first operation's activity is still on screen
+        // and will still deliver a result to it. Superseding it here - clearing
+        // `pending` and letting this second call take over - would discard that
+        // result, and it may be a payment that actually went through. PendingCall
+        // documents the liveness half of this design; this is the half that explains
+        // why refusing, rather than replacing, is the only safe choice.
+        if (pending.isLive(getBridge())) {
+            call.reject("An operation is already in progress", "OPERATION_IN_PROGRESS");
+            return;
         }
-        optionsBuilder.colors(colorsBuilder.build());
-        startActivityForResult(call, getKhipuLauncherIntent(getContext(), operationId, optionsBuilder.build()), "operationResult");
+
+        pending.set(call);
+        try {
+            startActivityForResult(call, getKhipuLauncherIntent(getContext(), operationId, options), "operationResult");
+        } catch (RuntimeException e) {
+            pending.clear();
+            call.reject("Could not launch the Khipu activity", "LAUNCH_FAILED", e);
+        }
     }
 
     @ActivityCallback
     private void operationResult(PluginCall call, ActivityResult result) {
+        pending.clear();
         if (call == null) {
             return;
         }
 
-        JSObject toRet = new JSObject();
-        try {
-            assert result.getData() != null;
-            KhipuResult khipuResult = (KhipuResult) Objects.requireNonNull(result.getData().getExtras()).getSerializable(
-                KHIPU_RESULT_EXTRA
-            );
-            assert khipuResult != null;
-            toRet = new JSObject(khipuResult.asJson());
-        } catch (JSONException e) {
-            call.reject("Error parsing the result");
+        JSObject payload = KhipuResultReader.read(extra(result));
+        if (payload == null) {
+            call.reject("The operation returned no result", "NO_RESULT");
+            return;
         }
-        call.resolve(toRet);
+
+        call.resolve(payload);
+    }
+
+    @SuppressWarnings("deprecation")
+    private static Serializable extra(ActivityResult result) {
+        Intent data = result.getData();
+        if (data == null) {
+            return null;
+        }
+        Bundle extras = data.getExtras();
+        if (extras == null) {
+            return null;
+        }
+        return extras.getSerializable(KHIPU_RESULT_EXTRA);
     }
 }
