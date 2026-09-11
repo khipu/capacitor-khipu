@@ -501,22 +501,22 @@ corrected below with the evidence, because the mistake is worth being able to ch
   through its back dialog to a normal `RESULT_OK`. Worth knowing when a merchant
   reports a payment that "hangs" with no error.
 
-- **A *terminal* message that fails to deserialise does not end the operation
-  either — it hangs exactly the same way, with no launcher callback and no settled
+- **A *terminal* message that fails to deserialise used to not end the operation
+  either — it hung exactly the same way, with no launcher callback and no settled
   promise.** Verified directly against `khipu-client-android 2.28.3` source:
-  `operationFinished` (`KhipuActivity.kt:307`, `:588`) only gates the socket
-  connection and a snackbar — nothing returns to the host app because of it.
-  `buildResult(...)` runs exactly once (`KhipuActivity.kt:318`), inside
-  `if (khipuUiState.returnToApp)`, and every `returnToApp()` call site is either a
+  `operationFinished` (`KhipuActivity.kt:307`, `:588`) only gated the socket
+  connection and a snackbar — nothing returned to the host app because of it.
+  `buildResult(...)` ran exactly once (`KhipuActivity.kt:318`), inside
+  `if (khipuUiState.returnToApp)`, and every `returnToApp()` call site was either a
   payer action (the cancel dialog at `:232`, the manual-transfer path at `:328`) or
-  sits inside `operationSuccess?.let`, `operationFailure?.let` or
+  sat inside `operationSuccess?.let`, `operationFailure?.let` or
   `operationWarning?.let` (`:445`, `:458`, `:491`) — all null, and so skipped, when
-  deserialisation failed. There is no inactivity timer. So this is the same symptom as
-  the `FORM_REQUEST` trade-off above, including feeding C4's liveness guard into
-  permanently refusing every later `startOperation` on that call — except here there is
-  no accepted product trade-off behind it, and no version of the SDK fixes it. The only
-  recoveries are the payer pressing back and confirming the cancel dialog, or this
-  plugin's bridge clearing `savedCalls` on a WebView navigation.
+  deserialisation failed. There was no inactivity timer. So this was the same symptom
+  as the `FORM_REQUEST` trade-off above, including feeding C4's liveness guard into
+  permanently refusing every later `startOperation` on that call — except here there
+  was no accepted product trade-off behind it. The only recoveries were the payer
+  pressing back and confirming the cancel dialog, or this plugin's bridge clearing
+  `savedCalls` on a WebView navigation.
 
   `2.28.1`'s guard put `OPERATION_WARNING` in the non-terminal bucket, but that was a
   defect, not a decision: `OPERATION_WARNING` has its own handler that finishes the
@@ -524,15 +524,34 @@ corrected below with the evidence, because the mistake is worth being able to ch
   (`OPERATION_FAILURE`/`OPERATION_MUST_CONTINUE`/`OPERATION_SUCCESS`). Fixed in
   `2.28.3`, which adds `OPERATION_WARNING` to the terminal set — confirmed directly
   against the artifact's bytecode (`SocketMessageGuardKt`), not just the version
-  number. This branch now depends on `2.28.3`. That fix is about a *decodable*
-  `OPERATION_WARNING` being tracked the same as the other three terminal types for
-  `operationFinished` bookkeeping (the socket connection, the snackbar) — it does
-  nothing for an *undecodable* message of any terminal type, `OPERATION_WARNING`
-  included, which is the hang described above and is not fixed by this bump or any
-  other. What `2.28.1`/`2.28.3` does fix, and what justifies the bump on its own, is
-  that before `2.28.1` this whole scenario reached socket.io's `EventThread` uncaught
-  and killed the merchant's process. Going from "kills the app" to "the call hangs" is
-  a real improvement; it is just not the one this section used to claim.
+  number. That fix is about a *decodable* `OPERATION_WARNING` being tracked the same
+  as the other three terminal types for `operationFinished` bookkeeping (the socket
+  connection, the snackbar) — it did nothing for an *undecodable* message of any
+  terminal type, `OPERATION_WARNING` included, which is the hang described above. What
+  `2.28.1`/`2.28.3` did fix, and what justified that bump on its own, is that before
+  `2.28.1` this whole scenario reached socket.io's `EventThread` uncaught and killed
+  the merchant's process. Going from "kills the app" to "the call hangs" was a real
+  improvement; it was just not the one this section used to claim — **this design
+  briefly recorded the hang itself as closed by `2.28.3`, which was wrong, and the item
+  was reopened once the source made that clear.**
+
+  **`2.28.4` closes the hang.** `javap -c -p` on `SocketMessageGuardKt`, reproduced
+  against both jars (292 classes in each, so the method reads the same thing both
+  times): `2.28.3`'s guard calls only `disconnectClient` and `setOperationFinished` on
+  an undecodable terminal message; `2.28.4` additionally calls `returnToApp` and
+  `setUnprocessableMessage`. Reading `KhipuActivityKt.buildResult` bytecode confirms
+  the effect: it branches on `KhipuUiState.getUnprocessableMessageType() != null`,
+  reads the operation ID, and builds the result with `exitTitle`/`exitMessage`/
+  `exitUrl` as empty-string literals, `continueUrl` and `failureReason` as `null`,
+  `result` as the literal `"ERROR"`, and an empty `events` array — so the `PluginCall`
+  resolves instead of hanging. This plan now depends on `2.28.4`, not `2.28.3`.
+
+  This interacts with the boundary decision in **C5**, above: `failureReason` arrives
+  as an explicit `null`, not absent and not `"USER_CANCELED"`. Our Android reader
+  omits null keys, so the merchant still sees the key absent rather than `null` — still
+  our deliberate reduction, but now it reduces an explicit `null` rather than standing
+  in for a wrong label. A genuine cancellation still reports
+  `failureReason: "USER_CANCELED"`.
 
 The protocol generator itself is untouched, so hardening the deserialisation remains
 open on the SDK side.

@@ -1,7 +1,7 @@
 # Status
 
-**Last updated:** 2026-09-10 — `plugin-hardening` branch, local verification complete,
-CI pending a push.
+**Last updated:** 2026-09-11 — `plugin-hardening` branch, Android SDK bumped to
+`2.28.4`, local verification complete, CI pending a push.
 
 This is the entry point for picking up plugin work without prior context. The design
 and plan for a pass in progress are kept next to it while it is being worked, and are
@@ -24,20 +24,24 @@ What landed:
   every path, including the ones that previously left a caller hanging.
 - **Android has a tested mapper and result reader**, and **refuses a concurrent
   operation** instead of leaving a second call to interfere with one already in flight.
-- **The Android SDK moved to `2.28.3`** (`com.khipu:khipu-client-android`), fixing a
-  defect in `2.28.1`: the socket guard's terminal-type list omitted `OPERATION_WARNING`,
-  even though `OPERATION_WARNING` has its own handler that finishes the operation
-  exactly like the three types the guard did list; `2.28.3` adds it. That fix is about a
-  *decodable* `OPERATION_WARNING` being tracked correctly — it does nothing for an
-  *undecodable* message of any terminal type, which still leaves the call in flight
-  indefinitely in `2.28.3` exactly as in `2.28.1` (see the `IKW-1232` entry below for the
-  evidence and the two recoveries). What the bump actually buys is that this scenario
-  used to kill the merchant's process outright before `2.28.1`; now it only hangs the
-  call. **The iOS SDK moved to `KhipuClientIOS 2.16.6`**, in sync across
-  `Package.swift` and the podspec, fixing a socket frame that could kill the merchant's
-  app and a terminal-message parse failure that left the payer with no exit while the
-  merchant got no callback; it also pins Starscream, closing a CocoaPods/SPM resolution
-  divergence that matters here because this plugin ships both managers.
+- **The Android SDK moved to `2.28.3`, then to `2.28.4`** (`com.khipu:khipu-client-android`).
+  `2.28.3` fixed a defect in `2.28.1`: the socket guard's terminal-type list omitted
+  `OPERATION_WARNING`, even though `OPERATION_WARNING` has its own handler that finishes
+  the operation exactly like the three types the guard did list; `2.28.3` adds it. That
+  fix was about a *decodable* `OPERATION_WARNING` being tracked correctly — it did
+  nothing for an *undecodable* message of any terminal type, which still left the call
+  in flight indefinitely in `2.28.3` exactly as in `2.28.1`. This document briefly
+  recorded that hang as closed by `2.28.3`; it was not, and the item was reopened once
+  the SDK source made that clear. **`2.28.4` closes it for real**: on an undecodable
+  terminal message the socket guard now calls `returnToApp()` instead of leaving it
+  unhandled, and `buildResult` has a branch for the unprocessable case, so the
+  `PluginCall` resolves instead of hanging — see the `IKW-1232` entry below for exactly
+  what the merchant now receives. **The iOS SDK moved to `KhipuClientIOS 2.16.6`**, in
+  sync across `Package.swift` and the podspec, fixing a socket frame that could kill the
+  merchant's app and a terminal-message parse failure that left the payer with no exit
+  while the merchant got no callback; it also pins Starscream, closing a CocoaPods/SPM
+  resolution divergence that matters here because this plugin ships both managers.
+  `KhipuClientIOS 2.17.0` is now published but not taken — see "Known pending".
 - **The vocabulary guard (`verify:keys`) now covers the web surface and both platforms'
   return path**, not just the options each platform reads: it checks `src/web.ts`
   against `src/definitions.ts`, and checks the result fields both the iOS and Android
@@ -188,9 +192,9 @@ instrument faithfully measuring an event that never occurred.
 
 ## Verified on device
 
-**As of 2026-09-05**, before this branch moved the Android SDK to `2.28.3` and the iOS
-SDK to `2.16.6` (see "Known pending" below — neither version has been re-verified on a
-device since). Every row
+**As of 2026-09-05**, before this branch moved the Android SDK to `2.28.4` (by way of
+`2.28.3`) and the iOS SDK to `2.16.6` (see "Known pending" below — neither version has
+been re-verified on a device since). Every row
 was run against the SDK version named in the last row, on that date; a later dependency
 bump invalidates only the rows measured against the version that changed, not the rows
 above them.
@@ -363,22 +367,59 @@ it.
     `forValue` recognises it.
   - _The mechanism_ is fixed under IKW-1232, which wraps the SDK's 23 socket listeners
     so a throwing handler never reaches the event thread. Expected as a patch release
-    after `2.28.0`. That stops the crash, not the hang: **a terminal message that fails
-    to parse does not end the operation either** — it leaves the call in flight
-    indefinitely, the same as a non-terminal failure like `FORM_REQUEST`. Verified
-    directly against `khipu-client-android 2.28.3` source: `operationFinished`
-    (`KhipuActivity.kt:307`, `:588`) only gates the socket connection and a snackbar,
-    never a return to the host app; `buildResult(...)` runs exactly once (`:318`),
-    inside `if (khipuUiState.returnToApp)`; and every `returnToApp()` call site is
-    either a payer action (the cancel dialog at `:232`, the manual-transfer path at
-    `:328`) or sits inside `operationSuccess?.let`, `operationFailure?.let` or
-    `operationWarning?.let` (`:445`, `:458`, `:491`) — all null, and so skipped, when
-    deserialisation failed. There is no inactivity timer, in `2.28.3` exactly as in
-    `2.28.1`. The only recoveries are the payer pressing back and confirming the cancel
-    dialog, or this plugin's bridge clearing `savedCalls` on a WebView navigation. What
-    the `2.28.1`/`2.28.3` bump actually buys is that before `2.28.1` this reached
-    socket.io's `EventThread` uncaught and killed the merchant's process; now it only
-    hangs the call — a real improvement, just not the one this document used to claim.
+    after `2.28.0`. That stops the crash — it does not, on its own, stop a terminal
+    message that fails to parse from hanging the call. See the next part for that hang
+    and how `2.28.4` closes it.
+  - _A terminal message that fails to deserialise_ used to leave the call in flight
+    indefinitely instead of ending it, the same symptom as a non-terminal failure like
+    `FORM_REQUEST`. Verified directly against `khipu-client-android 2.28.3` source:
+    `operationFinished` (`KhipuActivity.kt:307`, `:588`) only gated the socket
+    connection and a snackbar, never a return to the host app; `buildResult(...)` ran
+    exactly once (`:318`), inside `if (khipuUiState.returnToApp)`; and every
+    `returnToApp()` call site was either a payer action (the cancel dialog at `:232`,
+    the manual-transfer path at `:328`) or sat inside `operationSuccess?.let`,
+    `operationFailure?.let` or `operationWarning?.let` (`:445`, `:458`, `:491`) — all
+    null, and so skipped, when deserialisation failed. There was no inactivity timer, in
+    `2.28.3` exactly as in `2.28.1`. The only recoveries were the payer pressing back and
+    confirming the cancel dialog, or this plugin's bridge clearing `savedCalls` on a
+    WebView navigation.
+
+    **This document previously recorded this hang as closed by `2.28.3`. It was not.**
+    `2.28.1`/`2.28.3` fixed the *decodable* `OPERATION_WARNING` case (see the "Plugin
+    hardening pass" section above) and stopped the crash described in the mechanism
+    above — going from "kills the app" to "the call hangs" is a real improvement, just
+    not the one this document used to claim. An *undecodable* message of any terminal
+    type still hung exactly as before, and the item was reopened once the `2.28.3`
+    source made that clear.
+
+    **`2.28.4` closes it.** `javap -c -p` on `SocketMessageGuardKt` shows the
+    discriminator directly, reproduced against both jars (292 classes in each, so the
+    method reads the same thing both times): `2.28.3`'s guard calls only
+    `disconnectClient` and `setOperationFinished` on an undecodable terminal message;
+    `2.28.4` additionally calls `returnToApp` and `setUnprocessableMessage`. Reading
+    `KhipuActivityKt.buildResult` bytecode confirms what that produces: it branches on
+    `KhipuUiState.getUnprocessableMessageType() != null`, reads the operation ID, and
+    constructs the result with `exitTitle`, `exitMessage` and `exitUrl` as empty-string
+    literals, `continueUrl` and `failureReason` as `null`, `result` as the literal
+    `"ERROR"`, and an empty `events` array — so the `PluginCall` resolves instead of
+    hanging. What the merchant now receives:
+
+    | field | value |
+    | --- | --- |
+    | `operationId` | populated |
+    | `result` | `"ERROR"` |
+    | `failureReason` | `null` |
+    | `exitTitle`, `exitMessage`, `exitUrl` | `""` |
+    | `continueUrl` | `null` |
+    | `events` | empty |
+
+    **This interacts with the boundary decision above.** `failureReason` arrives as an
+    explicit `null`, not absent and not `"USER_CANCELED"`. Our Android reader omits null
+    keys — the same reduction recorded in "Decide the canonical shape of an absent
+    result field" — so the merchant still sees the key absent rather than `null`. That
+    remains our deliberate choice, but it now reduces an explicit `null` rather than
+    standing in for a wrong label. A genuine cancellation still reports
+    `failureReason: "USER_CANCELED"`.
   - _The deserialisation itself_ is not hardened. Verified against protocol `1.0.60`:
     `forValue` declares `throws IOException`, there is `@JsonValue` and `@JsonCreator`
     but no `@JsonEnumDefaultValue`, the converter configures only
@@ -391,14 +432,28 @@ it.
 
 - **Verify dark mode colour mapping on Android**, and **compare `KhipuResult` fields
   between iOS and Android** on the same operation.
-- **`khipu-client-android 2.28.3` has never been exercised at runtime here.** "Verified
-  on device" above is against `2.27.0`; the evidence for `2.28.3` is a clean Gradle
-  build plus the jar's own version markers, not a device run. Re-verify on device
-  before trusting that table for `2.28.3`.
+- **`khipu-client-android 2.28.4` has never been exercised at runtime here.** "Verified
+  on device" above is against `2.27.0`; the evidence for `2.28.4` is a clean Gradle
+  build (`./gradlew clean build test --rerun-tasks`, forced, no `UP-TO-DATE` false
+  green) resolving `com.khipu:khipu-client-android:2.28.4` on
+  `releaseRuntimeClasspath`, plus the jar's own bytecode markers, not a device run.
+  Re-verify on device before trusting that table for `2.28.4`, and before trusting the
+  merchant-visible fields recorded above for the undecodable-terminal-message case.
 - **`KhipuClientIOS 2.16.6` has never been exercised at runtime here either.** "Verified
   on device" above is against `2.16.5`; the evidence for `2.16.6` is a clean
   `xcodebuild build` plus the package's own version pin, not a device run. Re-verify on
   device before trusting that table for `2.16.6`.
+- **Staying on `KhipuClientIOS 2.16.6`, not moving to `2.17.0`, is a decision to
+  revisit — not a permanent position.** `2.17.0` is published and fixes two real
+  defects: denying the location permission used to end the operation and return to the
+  merchant's app, where now the payment continues instead, matching Android; and any
+  CoreLocation failure used to leave the payment stuck on a spinner with no way out. But
+  `2.17.0` **introduces a known defect**: an unreadable terminal message makes the
+  merchant receive `failureReason: "USER_CANCELED"` when the SDK simply could not read
+  it — a wrong label, not a missing one. It is fixed in `IKW-1245`, merged and **not
+  released**. Taking `2.17.0` today would trade a hang the payer can see for a wrong
+  label the merchant's code will act on — logging a cancellation that never happened.
+  We wait for the release carrying `IKW-1245`.
 - **Exercise `canOpenURL` on a physical device** with a bank app installed. The nine
   `LSApplicationQueriesSchemes` are still verified only as a declaration.
 - **`exitUrl` shipped mistyped in `2.11.2` and `2.11.3`** (`string` instead of
