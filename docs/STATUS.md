@@ -236,9 +236,14 @@ steps the README calls for: the `LSApplicationQueriesSchemes` in `Info.plist` an
 khenshin Maven repository in `allprojects`. Anything that turns out to be needed and is
 not written down is the finding.
 
-Two practical notes: use Node 22, since Homebrew's Node 26 builds a different
-dependency tree; and point `xcodebuild` at the simulator **by UDID**, not by name, which
-is ambiguous once several runtimes are installed.
+Three practical notes: use Node 22, since Homebrew's Node 26 builds a different
+dependency tree; point `xcodebuild` at the simulator **by UDID**, not by name, which is
+ambiguous once several runtimes are installed; and pin `typescript@5.9.3` when building
+a Capacitor 7 test app — `typescript@7.x` breaks `@capacitor/cli@7.x`, which can no
+longer parse `capacitor.config.ts`, so `cap init` fails before khipu is involved at all.
+`@capacitor/cli@8.5.1` carries the fix; 7.x does not. This is not our defect and does
+not belong in the merchant README — someone else's bug copied into our documentation
+ages badly — but it will stop whoever repeats this exercise next.
 
 All three documented install commands resolved correctly, checked against the
 registry: `@cap6` to `2.11.3`, `@cap7` to `3.0.0`, bare to `4.0.0`. And the `7.x`
@@ -266,6 +271,35 @@ and `2.11.3` was published specifically for this.
 
 The exercise also reproduced, outside the harness, the `locale` divergence: the same
 operation with no `locale` came up in Spanish on iOS and in English on Android.
+
+### This round (`plugin-hardening`, pre-publish)
+
+This branch has not been published, so the exercise above could not be repeated as
+written: installing by dist-tag would have tested the old release, not this branch's
+code. Instead, two apps were built from nothing, Capacitor 7 and Capacitor 8, each
+installing the plugin from a **local `npm pack` tarball** rather than a dist-tag.
+Packing also exercises the `files` array in `package.json` — the same place a package
+can ship incomplete and nobody finds out until after publishing.
+
+Both lines were built on **both** native platforms: Capacitor 8 via SPM (`CapApp-SPM`,
+no Podfile), Capacitor 7 via CocoaPods (`pod install`, resolving `KhipuClientIOS 2.16.6`
+and `Starscream 4.0.8`). The Starscream pin exists so the two package managers stop
+resolving different dependency graphs, and this is the first time both paths were
+exercised against it.
+
+The README's usage snippets were copied literally into a **TypeScript strict** file, and
+`tsc --noEmit` passed on both lines. This check is now part of the recipe because the
+previous round bundled with esbuild alone, which strips types without checking them —
+exactly how a contract requiring every option key shipped with a README example that did
+not compile.
+
+Kotlin-free Android builds succeeded on both lines, including Capacitor 7 at **AGP
+8.7.2** — the precise boundary where the README's "you do not need Kotlin" claim starts
+being true.
+
+**Not verified: no real payment was run on either line.** There are no Khipu API
+credentials in this environment, so there is no `operationId`, so nothing past the
+plugin being wired in and callable was exercised.
 
 ## Cross-SDK finding to report upstream
 
