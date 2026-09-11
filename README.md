@@ -34,24 +34,31 @@ only allows an app to check whether it can open another app's URL scheme
 returns `false`, the SDK silently skips opening the bank app **without raising any
 error**, and the two-factor authorization step simply never happens.
 
-Add `LSApplicationQueriesSchemes` to your app's `Info.plist`:
+Add `LSApplicationQueriesSchemes` to your app's `Info.plist`, at `ios/App/App/Info.plist`
+in a standard Capacitor project. It is a top-level key inside the root `<dict>`,
+alongside the keys Capacitor already put there:
 
 ```xml
-<key>LSApplicationQueriesSchemes</key>
-<array>
-  <string>bancochilemipass2</string>
-  <string>BciPassApp</string>
-  <string>BICEPassApp</string>
-  <string>scotiabankgo</string>
-  <string>SantanderPassApp</string>
-  <string>tupass</string>
-  <string>bancoestado</string>
-  <string>itau.cl</string>
-  <string>SecurityPass</string>
-</array>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>LSApplicationQueriesSchemes</key>
+  <array>
+    <string>bancochilemipass2</string>
+    <string>BciPassApp</string>
+    <string>BICEPassApp</string>
+    <string>scotiabankgo</string>
+    <string>SantanderPassApp</string>
+    <string>tupass</string>
+    <string>bancoestado</string>
+    <string>itau.cl</string>
+    <string>SecurityPass</string>
+  </array>
+  <!-- ...the rest of Capacitor's own keys (CFBundleName, UILaunchStoryboardName, etc.)... -->
+</dict>
+</plist>
 ```
-
-This is already applied as a reference in `example/ios/App/App/Info.plist`.
 
 ## Android setup
 
