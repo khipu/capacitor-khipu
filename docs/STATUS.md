@@ -24,8 +24,14 @@ What landed:
   every path, including the ones that previously left a caller hanging.
 - **Android has a tested mapper and result reader**, and **refuses a concurrent
   operation** instead of leaving a second call to interfere with one already in flight.
-- **The Android SDK moved to `2.28.1`** (`com.khipu:khipu-client-android`). The iOS SDK
-  stays on `KhipuClientIOS 2.16.5`, in sync across `Package.swift` and the podspec.
+- **The Android SDK moved to `2.28.3`** (`com.khipu:khipu-client-android`), fixing a
+  defect in `2.28.1`: the socket guard omitted `OPERATION_WARNING` from its terminal
+  message types, so an undecodable one left the operation unfinished and the call in
+  flight forever. **The iOS SDK moved to `KhipuClientIOS 2.16.6`**, in sync across
+  `Package.swift` and the podspec, fixing a socket frame that could kill the merchant's
+  app and a terminal-message parse failure that left the payer with no exit while the
+  merchant got no callback; it also pins Starscream, closing a CocoaPods/SPM resolution
+  divergence that matters here because this plugin ships both managers.
 - **The vocabulary guard (`verify:keys`) now covers the web surface and both platforms'
   return path**, not just the options each platform reads: it checks `src/web.ts`
   against `src/definitions.ts`, and checks the result fields both the iOS and Android
@@ -176,8 +182,9 @@ instrument faithfully measuring an event that never occurred.
 
 ## Verified on device
 
-**As of 2026-09-05**, before this branch moved the Android SDK to `2.28.1` (see "Known
-pending" below — that version has not been re-verified on a device since). Every row
+**As of 2026-09-05**, before this branch moved the Android SDK to `2.28.3` and the iOS
+SDK to `2.16.6` (see "Known pending" below — neither version has been re-verified on a
+device since). Every row
 was run against the SDK version named in the last row, on that date; a later dependency
 bump invalidates only the rows measured against the version that changed, not the rows
 above them.
@@ -332,10 +339,14 @@ it.
 
 - **Verify dark mode colour mapping on Android**, and **compare `KhipuResult` fields
   between iOS and Android** on the same operation.
-- **`khipu-client-android 2.28.1` has never been exercised at runtime here.** "Verified
-  on device" above is against `2.27.0`; the evidence for `2.28.1` is a clean Gradle
+- **`khipu-client-android 2.28.3` has never been exercised at runtime here.** "Verified
+  on device" above is against `2.27.0`; the evidence for `2.28.3` is a clean Gradle
   build plus the jar's own version markers, not a device run. Re-verify on device
-  before trusting that table for `2.28.1`.
+  before trusting that table for `2.28.3`.
+- **`KhipuClientIOS 2.16.6` has never been exercised at runtime here either.** "Verified
+  on device" above is against `2.16.5`; the evidence for `2.16.6` is a clean
+  `xcodebuild build` plus the package's own version pin, not a device run. Re-verify on
+  device before trusting that table for `2.16.6`.
 - **Exercise `canOpenURL` on a physical device** with a bank app installed. The nine
   `LSApplicationQueriesSchemes` are still verified only as a declaration.
 - **`exitUrl` shipped mistyped in `2.11.2` and `2.11.3`** (`string` instead of
