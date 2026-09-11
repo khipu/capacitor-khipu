@@ -497,13 +497,28 @@ be correct about:
   and reads as `undefined`, which is what `failureReason: string | undefined` promises.
   A test asserts it rather than leaving it to inference.
 - **A non-terminal message that fails is logged and ignored**, and the operation
-  continues. If the message was a `FORM_REQUEST`, the payer waits for a form that will
-  never render: no crash, no exit. For us that means the activity stays up and the
+  continues. This is a genuine product trade-off for messages that really are
+  non-terminal, such as `FORM_REQUEST`: the payer waits for a form that will never
+  render, no crash, no exit. For us that means the activity stays up and the
   `PluginCall` stays genuinely in flight, so C4's liveness check reports it live and a
   second `startOperation` is refused — which is correct, because the first really is
   still running. The escape is the payer cancelling, which the SDK routes through its
   back dialog to a normal `RESULT_OK`. Worth knowing when a merchant reports a payment
   that "hangs" with no error.
+
+  `2.28.1`'s guard put `OPERATION_WARNING` in this same bucket, but that was a defect,
+  not a decision: `OPERATION_WARNING` has its own handler that finishes the operation,
+  same as the three types the guard did list as terminal
+  (`OPERATION_FAILURE`/`OPERATION_MUST_CONTINUE`/`OPERATION_SUCCESS`). A
+  failed-to-deserialise `OPERATION_WARNING` therefore hung forever under `2.28.1` —
+  same symptom as the genuine `FORM_REQUEST` trade-off above, including feeding C4's
+  liveness guard into permanently refusing every later `startOperation` on that call,
+  but with no accepted trade-off behind it: nobody chose to ignore `OPERATION_WARNING`,
+  it was left out of the terminal set by mistake. Fixed in `2.28.3`, which adds
+  `OPERATION_WARNING` to the terminal set — confirmed directly against the artifact's
+  bytecode (`SocketMessageGuardKt`), not just the version number. This branch now
+  depends on `2.28.3`. The trade-off described above remains real for genuinely
+  non-terminal messages; the defect did not.
 
 The protocol generator itself is untouched, so hardening the deserialisation remains
 open on the SDK side.
