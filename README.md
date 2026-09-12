@@ -6,11 +6,18 @@ Capacitor plugin for Khipu
 
 | Capacitor | Plugin | Install with | Minimum iOS | minSdk | Status |
 | --- | --- | --- | --- | --- | --- |
-| 8 | 4.x | `npm install capacitor-khipu` | 15 | 24 | maintained |
-| 7 | 3.x | `npm install capacitor-khipu@cap7` | 14 | 23 | maintained |
+| 8 | 8.x | `npm install capacitor-khipu` | 15 | 24 | maintained |
+| 7 | 7.x | `npm install capacitor-khipu@cap7` | 14 | 23 | maintained |
 | 5 and 6 | 2.11.3 | `npm install capacitor-khipu@cap6` | 13 | 22 | end of support |
 
-The 3.x and 4.x lines support **both CocoaPods and Swift Package Manager**, with no
+**The plugin's major version now matches the Capacitor major it supports**: `8.x` for
+Capacitor 8, `7.x` for Capacitor 7. These lines were previously numbered `4.x` and `3.x`
+and jumped straight to `8.0.0` and `7.0.0`. Nothing else about them changed — same
+install command, same dist-tag, same support. The old scheme gave each line one major
+number, which left a breaking change inside a line nowhere to go without colliding with
+the next line's number; tying the major to Capacitor's own removes that ceiling for good.
+
+The 7.x and 8.x lines support **both CocoaPods and Swift Package Manager**, with no
 extra steps on your side: the Capacitor CLI picks the `Package.swift` or the
 `CapacitorKhipu.podspec` depending on which manager your app uses. The two managers
 cannot coexist in the same iOS project.
@@ -158,7 +165,7 @@ unless you send `locale` explicitly.
 
 `result.exitUrl` can come back empty on real payments, so check it before using it.
 
-## Behaviour changes in 4.0.0
+## Behaviour changes in 7.0.0
 
 - **Breaking, iOS only: `exitUrl`, `continueUrl` and `failureReason` are now omitted
   when the SDK has no value for them, instead of arriving as JSON `null`.** Android
@@ -271,10 +278,10 @@ with no code, and web rejects a bare `Error`. Do not write
 | **`operationId`**   | <code>string</code>                                     | The operation id that was passed to `startOperation`.                                                                                                                                                                                                                                                                                                                                                              |
 | **`exitTitle`**     | <code>string</code>                                     | Title of the closing screen the SDK already showed the payer (success, failure, warning, or continue). Confirmed on iOS, Android and web: all three set it from the same title the SDK's own screen displayed. Reuse it if you render your own screen instead of the SDK's.                                                                                                                                        |
 | **`exitMessage`**   | <code>string</code>                                     | Body text of the closing screen the SDK already showed the payer, paired with `exitTitle`. Confirmed on iOS, Android and web. Reuse it if you render your own screen instead of the SDK's.                                                                                                                                                                                                                         |
-| **`exitUrl`**       | <code>string</code>                                     | URL associated with the exit screen. Can come back empty on real payments, so check it before using it. When there is none, both native platforms omit the key, so it reads as `undefined`. Until 4.0.0 iOS sent an explicit JSON `null` instead — see the breaking change in the README.                                                                                                                          |
+| **`exitUrl`**       | <code>string</code>                                     | URL associated with the exit screen. Can come back empty on real payments, so check it before using it. When there is none, both native platforms omit the key, so it reads as `undefined`. Until 7.0.0 iOS sent an explicit JSON `null` instead — see the breaking change in the README.                                                                                                                          |
 | **`result`**        | <code>'OK' \| 'ERROR' \| 'WARNING' \| 'CONTINUE'</code> | Outcome of the operation. A user who abandons the payment arrives here as `'ERROR'` with `failureReason: 'USER_CANCELED'` — not as a rejected promise.                                                                                                                                                                                                                                                             |
-| **`failureReason`** | <code>string</code>                                     | Machine-readable reason behind the current `result`, straight from the Khipu protocol. Treat it as an open-ended string, not a fixed list: the protocol adds values over time — `USER_DISCONNECTED` is a recent one — and a hardcoded list here would go stale silently. When there is none, both native platforms omit the key, so it reads as `undefined`. Until 4.0.0 iOS sent an explicit JSON `null` instead. |
-| **`continueUrl`**   | <code>string</code>                                     | URL to send the payer to so they can finish the operation. Present when, and only when, `result` is `'CONTINUE'` — confirmed on iOS, Android and web, where every other outcome branch leaves it `undefined`/`nil`. Undefined for every other `result` value. When there is none, both native platforms omit the key, so it reads as `undefined`. Until 4.0.0 iOS sent an explicit JSON `null` instead.            |
+| **`failureReason`** | <code>string</code>                                     | Machine-readable reason behind the current `result`, straight from the Khipu protocol. Treat it as an open-ended string, not a fixed list: the protocol adds values over time — `USER_DISCONNECTED` is a recent one — and a hardcoded list here would go stale silently. When there is none, both native platforms omit the key, so it reads as `undefined`. Until 7.0.0 iOS sent an explicit JSON `null` instead. |
+| **`continueUrl`**   | <code>string</code>                                     | URL to send the payer to so they can finish the operation. Present when, and only when, `result` is `'CONTINUE'` — confirmed on iOS, Android and web, where every other outcome branch leaves it `undefined`/`nil`. Undefined for every other `result` value. When there is none, both native platforms omit the key, so it reads as `undefined`. Until 7.0.0 iOS sent an explicit JSON `null` instead.            |
 | **`events`**        | <code>KhipuEvent[]</code>                               | Events recorded during the operation, in the order the SDK reported them.                                                                                                                                                                                                                                                                                                                                          |
 
 

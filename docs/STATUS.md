@@ -83,12 +83,17 @@ against by checking for the binary separately in the `ios` job. **A green `npm r
 lint` on this machine is not evidence the Swift is clean** — nothing has reviewed it.
 Swift lint coverage for the `plugin-hardening` branch comes from CI only.
 
-**The version to publish is `4.0.0`** — this line's next major. (This paragraph used to
-say `4.1.0`, which was the *other* line's number copied across.) The iOS null-key
-alignment that followed this pass is a breaking change for iOS merchants, and folding it
-in here means merchants migrate once rather than twice. Publishing is not done here:
-`npm publish` needs a human with 2FA, and pushing (or merging, or publishing) is the
-user's call, not something run as part of this pass.
+**The versions to publish are `7.0.0` on this line and `8.0.0` on `main`.** From now on
+the plugin's major matches the Capacitor major it supports, so the lines are `7.x` and
+`8.x` rather than `3.x` and `4.x`.
+
+That is a decision (2026-09-12), not a whim. The old scheme gave each line exactly one
+major, so a breaking change *inside* a line had nowhere to go: this pass wanted `4.0.0`
+for this line, and **`4.0.0` is already published** — it is `main`'s current release, and
+npm versions are global to the package, not per dist-tag. An earlier version of this
+document prescribed exactly that impossible number. Tying the major to Capacitor's own
+removes the ceiling permanently and makes the number say which Capacitor it is for.
+Publishing is not done here: `npm publish` needs a human with 2FA.
 
 **The gate is lifted: `khipu-client-android 2.28.5` ships the `KhipuCookieJar` fix, and
 both lines are on it.** The release was held rather than publish a version carrying a
@@ -172,8 +177,12 @@ publish itself.
    build reporting `v2.28.3`. The APK had been rebuilt but never installed — the driver
    only ever installed Cap 8's. Caught because the SDK renders its own version in the
    screen footer. Check the version the app *reports*, not the one you built.
-5. Publish `5.0.0` on the 4.x line and `4.0.0` on the 3.x line, both majors for the iOS
-   null-key alignment already in these branches.
+5. Publish `7.0.0` from `7.x` and `8.0.0` from `main`, both majors for the iOS null-key
+   alignment already in these branches. Each line's release-it config lives in its own
+   `package.json` and already carries the right `requireBranch` and dist-tag (`cap7` for
+   this line, `latest` for `main`), so no `--npm.tag` on the command line. The increment
+   is explicit — `release-it 7.0.0` / `release-it 8.0.0` — because `major` alone would
+   land on `4.0.0` and `5.0.0`, and `4.0.0` is taken.
 
 ## Port to `7.x`
 
@@ -215,8 +224,8 @@ single Capacitor 5 target into three lines: two maintained, one frozen.
 
 | Line | Branch        | Capacitor | iOS min | dist-tag | Version  |
 | ---- | ------------- | --------- | ------- | -------- | -------- |
-| 4.x  | `main`        | 8         | 15      | `latest` | `4.0.0`  |
-| 3.x  | `7.x`         | 7         | 14      | `cap7`   | `3.0.0`  |
+| 8.x  | `main`        | 8         | 15      | `latest` | `4.0.0`  |
+| 7.x  | `7.x`         | 7         | 14      | `cap7`   | `3.0.0`  |
 | 2.x  | `release/2.x` | 5 and 6   | 13      | `cap6`   | `2.11.3` |
 
 **Both maintained lines expose `Package.swift` and `CapacitorKhipu.podspec`**, so a
@@ -462,8 +471,8 @@ are comparable to each other one for one. All measured 2026-09-12.
 | 4.x (Cap 8) | Android | `2.28.5` | **6 keys, both absent** |
 | 3.x (Cap 7) | Android | `2.28.5` | **6 keys, both absent** |
 
-The last four rows are what this major is for (`5.0.0` on the 4.x line,
-`4.0.0` on the 3.x line): iOS now returns the same six keys Android
+The last four rows are what this major is for (`8.0.0` on the 8.x line,
+`7.0.0` on the 7.x line): iOS now returns the same six keys Android
 returns, measured on a device rather than argued from source. The raw dump confirms the
 keys are gone, not nulled — `{"exitUrl":"https://…","events":[…],"operationId":…}` with
 no `continueUrl` or `failureReason` entry. The two lines agree with each other on each
@@ -632,7 +641,7 @@ it.
 
     **This interacts with the boundary decision above.** `failureReason` arrives as an
     explicit `null` at the SDK layer, not absent and not `"USER_CANCELED"`. Both our
-    readers omit null keys as of 4.0.0 — see "Decide the canonical shape of an absent
+    readers omit null keys as of 7.0.0 — see "Decide the canonical shape of an absent
     result field" — so the merchant sees the key absent rather than `null`, and sees it
     that way on either platform. That remains our deliberate choice, but it now reduces
     an explicit `null` rather than standing in for a wrong label. A genuine cancellation
