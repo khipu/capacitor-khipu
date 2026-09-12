@@ -246,13 +246,9 @@ export interface KhipuResult {
    * URL associated with the exit screen. Can come back empty on real payments, so
    * check it before using it.
    *
-   * When absent, iOS sends it as JSON `null` while Android omits the key entirely —
-   * both are valid under how each platform's bridge serialises a nil/absent optional.
-   * Aligning the two is under consideration, not decided: it would most likely mean
-   * changing iOS to omit the key like Android, which is a breaking change for existing
-   * iOS merchants and would need a major version (see `docs/STATUS.md`,
-   * "Known pending"). Compare with truthiness or `??`, not `=== undefined`, so it
-   * reads the same either way today.
+   * When there is none, both native platforms omit the key, so it reads as
+   * `undefined`. Until 5.0.0 iOS sent an explicit JSON `null` instead — see the
+   * breaking change in the README.
    */
   exitUrl: string | undefined;
   // Never add 'CANCELED' (or any other value) to this union without a major version
@@ -270,8 +266,8 @@ export interface KhipuResult {
    * values over time — `USER_DISCONNECTED` is a recent one — and a hardcoded list
    * here would go stale silently.
    *
-   * When absent, iOS sends it as JSON `null` while Android omits the key entirely.
-   * Compare with truthiness or `??`, not `=== undefined`.
+   * When there is none, both native platforms omit the key, so it reads as
+   * `undefined`. Until 5.0.0 iOS sent an explicit JSON `null` instead.
    */
   failureReason: string | undefined;
   /**
@@ -280,8 +276,8 @@ export interface KhipuResult {
    * every other outcome branch leaves it `undefined`/`nil`. Undefined for every
    * other `result` value.
    *
-   * When absent, iOS sends it as JSON `null` while Android omits the key entirely.
-   * Compare with truthiness or `??`, not `=== undefined`.
+   * When there is none, both native platforms omit the key, so it reads as
+   * `undefined`. Until 5.0.0 iOS sent an explicit JSON `null` instead.
    */
   continueUrl: string | undefined;
   /**

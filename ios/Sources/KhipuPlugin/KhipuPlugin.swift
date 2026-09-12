@@ -29,27 +29,7 @@ public class KhipuPlugin: CAPPlugin, CAPBridgedPlugin {
             KhipuLauncher.launch(presenter: presenter,
                                  operationId: operationId,
                                  options: options) { result in
-
-                var events: [[String:String]] = []
-
-                for event in result.events {
-                    events.append([
-                        "name": event.name,
-                        "timestamp": event.timestamp,
-                        "type": event.type
-                    ])
-                }
-
-                call.resolve([
-                    "operationId": result.operationId,
-                    "exitTitle": result.exitTitle,
-                    "exitMessage": result.exitMessage,
-                    "exitUrl": result.exitUrl as Any,
-                    "result": result.result,
-                    "failureReason": result.failureReason as Any,
-                    "continueUrl": result.continueUrl as Any,
-                    "events": events
-                ])
+                call.resolve(KhipuResultReader.read(result))
             }
         }
 

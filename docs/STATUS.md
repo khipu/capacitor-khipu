@@ -345,16 +345,23 @@ it.
 
 ## Known pending
 
-- **Decide the canonical shape of an absent result field.** Measured, no longer open:
-  Capacitor's iOS bridge serialises `nil as Any` to JSON `null`
-  (`PluginCallResult.jsonRepresentation` → `JSONSerialization`), so iOS delivers
-  `exitUrl`, `continueUrl` and `failureReason` as `null` while Android omits them. The
-  published type is `string | undefined`, which `null` does not satisfy, so iOS is the
-  side breaking the declared contract. Aligning on "omit" is type-correct but changes
-  what existing iOS merchants receive, so it needs a decision rather than a patch.
-  Android SDK ticket `IKW-1233` will make `asJson()` emit nulls to match iOS; since our
-  reader omits nulls, that will not change the merchant-visible result and the
-  divergence will persist by our choice.
+- ~~**Decide the canonical shape of an absent result field.**~~ **Decided and done in
+  5.0.0: both platforms omit.** iOS was the side breaking the declared
+  `string | undefined`, and the cause was ours, not Capacitor's: `result.exitUrl as Any`
+  on an empty Swift optional does not produce nil, it produces an `Any` wrapping the
+  empty optional, so the key was written and the bridge serialised it as `null`. That
+  cast dated from the plugin's first commit. The payload now goes through
+  `KhipuResultReader.swift`, mirroring the Java reader, and `check-option-keys.mjs`
+  reads both with one pattern so they cannot drift apart again silently.
+
+  It is a breaking change for iOS merchants — `'k' in result`, `=== null`,
+  `Object.keys` and `JSON.stringify` all change — and **TypeScript does not flag
+  `=== null` against `string | undefined`** (verified against `tsc --strict` with a
+  positive control), so the compiler will not find these for merchants. Hence the major.
+
+  Android SDK ticket `IKW-1233` will make `asJson()` emit nulls to match what iOS used
+  to do; since both readers now omit nulls, it does not change the merchant-visible
+  result either way.
 - **Merchants need no manifest entry for `KhipuActivity`.** The AAR's own
   `AndroidManifest.xml` declares
   `<activity android:name="com.khipu.client.KhipuActivity" android:exported="false" …>`;
@@ -425,12 +432,12 @@ it.
     | `events` | empty |
 
     **This interacts with the boundary decision above.** `failureReason` arrives as an
-    explicit `null`, not absent and not `"USER_CANCELED"`. Our Android reader omits null
-    keys — the same reduction recorded in "Decide the canonical shape of an absent
-    result field" — so the merchant still sees the key absent rather than `null`. That
-    remains our deliberate choice, but it now reduces an explicit `null` rather than
-    standing in for a wrong label. A genuine cancellation still reports
-    `failureReason: "USER_CANCELED"`.
+    explicit `null` at the SDK layer, not absent and not `"USER_CANCELED"`. Both our
+    readers omit null keys as of 5.0.0 — see "Decide the canonical shape of an absent
+    result field" — so the merchant sees the key absent rather than `null`, and sees it
+    that way on either platform. That remains our deliberate choice, but it now reduces
+    an explicit `null` rather than standing in for a wrong label. A genuine cancellation
+    still reports `failureReason: "USER_CANCELED"`.
   - _The deserialisation itself_ is not hardened. Verified against protocol `1.0.60`:
     `forValue` declares `throws IOException`, there is `@JsonValue` and `@JsonCreator`
     but no `@JsonEnumDefaultValue`, the converter configures only
