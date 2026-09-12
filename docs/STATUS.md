@@ -1,13 +1,14 @@
 # Status
 
-**Last updated:** 2026-09-11 — `plugin-hardening` branch, Android SDK bumped to
-`2.28.4` and iOS SDK to `2.17.1`, local verification complete, CI pending a push.
+**Last updated:** 2026-09-12 — hardening pass merged to `main` (PR #11), plus the iOS
+null-key alignment. Android SDK `2.28.4`, iOS SDK `2.17.1`. Verified locally and on
+device; not yet published.
 
 This is the entry point for picking up plugin work without prior context. The design
 and plan for a pass in progress are kept next to it while it is being worked, and are
 not retained once it lands — this document, not those files, is the durable record.
 
-## Plugin hardening pass (`plugin-hardening` branch, not yet pushed)
+## Plugin hardening pass (merged to `main` in PR #11)
 
 Twelve tasks changed TypeScript, Swift, Java, the three guard scripts, the podspec and CI.
 What landed:
@@ -81,9 +82,11 @@ against by checking for the binary separately in the `ios` job. **A green `npm r
 lint` on this machine is not evidence the Swift is clean** — nothing has reviewed it.
 Swift lint coverage for this branch comes from CI only.
 
-**The version to publish is `4.1.0`.** Publishing is not done here: `npm publish` needs
-a human with 2FA, and pushing the branch (or opening the PR, or merging) is the user's
-call, not something run as part of this pass.
+**The version to publish is `5.0.0`**, not `4.1.0`: the iOS null-key alignment that
+followed this pass is a breaking change for iOS merchants, and folding it in here means
+merchants migrate once rather than twice. Publishing is not done here: `npm publish`
+needs a human with 2FA, and pushing (or merging, or publishing) is the user's call, not
+something run as part of this pass.
 
 ## Published lines
 
@@ -322,6 +325,37 @@ being true.
 credentials in this environment, so there is no `operationId`, so nothing past the
 plugin being wired in and callable was exercised.
 
+## End-to-end payments on device
+
+Real payments driven through the from-scratch doctest apps, against a production
+developer account whose only bank is DemoBank. Every row below is a payment the SDK
+carried to `result: "OK"` with the exit screen "¡Listo, transferiste!", so the key sets
+are comparable to each other one for one. All measured 2026-09-12.
+
+| line | platform | SDK | `Object.keys(result)` |
+| --- | --- | --- | --- |
+| 4.x (Cap 8) | iOS | `2.16.6` | 8 keys, `continueUrl`/`failureReason` present as `null` |
+| 3.x (Cap 7) | iOS | `2.16.6` | 8 keys, both present as `null` |
+| 3.x (Cap 7) | Android | `2.28.3` | 6 keys, both absent |
+| 3.x (Cap 7) | iOS | `2.17.1` | 8 keys, both present as `null` |
+| 4.x (Cap 8) | iOS | `2.17.1`, post-fix | **6 keys, both absent** |
+| 3.x (Cap 7) | iOS | `2.17.1`, post-fix | **6 keys, both absent** |
+
+The last two rows are what this major is for (`5.0.0` on the 4.x line,
+`4.0.0` on the 3.x line): iOS now returns the same six keys Android
+returns, measured on a device rather than argued from source. The raw dump confirms the
+keys are gone, not nulled — `{"exitUrl":"https://…","events":[…],"operationId":…}` with
+no `continueUrl` or `failureReason` entry. The two lines agree with each other on each
+platform, and now the platforms agree with each other.
+
+**What these runs do not establish.** Three of the six reached `status: done` via
+`GET /v3/payments/{id}`. The rest were still `verifying`/`pending` well after the fact,
+one of them hours later. That is a settlement state on Khipu's side, reached long after
+the SDK reports success and the plugin resolves, so it cannot affect the key
+measurement — but it does mean these runs do not prove the money settled. Separately,
+**the web layer has never been exercised by a real payment**, and it is the
+most-changed code in this pass.
+
 ## Cross-SDK finding to report upstream
 
 **The two native SDKs disagree on the `locale` default.** When the merchant does not
@@ -345,6 +379,14 @@ it.
 
 ## Known pending
 
+- **`khipu-client-android 2.28.4` carries a crash that kills the merchant's process.**
+  `KhipuCookieJar.persistToDisk` iterates an unsynchronised `HashSet` that three
+  OkHttp-thread paths mutate, throwing `ConcurrentModificationException`. Observed
+  firing twice in 700 ms with identical stacks during an Android run on `2.28.3`, and
+  the SDK team confirmed the same code is still present in `2.28.4` — the version both
+  lines ship. It is an uncaught exception on a background thread, so no bridge can
+  catch it and there is nothing this plugin can do to contain it: the merchant's app
+  disappears. Reported upstream; no fixed version yet.
 - ~~**Decide the canonical shape of an absent result field.**~~ **Decided and done in
   5.0.0: both platforms omit.** iOS was the side breaking the declared
   `string | undefined`, and the cause was ours, not Capacitor's: `result.exitUrl as Any`
@@ -457,10 +499,11 @@ it.
   `releaseRuntimeClasspath`, plus the jar's own bytecode markers, not a device run.
   Re-verify on device before trusting that table for `2.28.4`, and before trusting the
   merchant-visible fields recorded above for the undecodable-terminal-message case.
-- **`KhipuClientIOS 2.17.1` has never been exercised at runtime here either.** "Verified
-  on device" above is against `2.16.5`; the evidence for `2.17.1` (by way of `2.16.6`)
-  is a clean `xcodebuild build` plus the package's own version pin, not a device run.
-  Re-verify on device before trusting that table for `2.17.1`.
+- **`KhipuClientIOS 2.17.1` has now been exercised at runtime**, in three real payments
+  on device (see "End-to-end payments on device"), resolved as `2.17.1` in both the
+  CocoaPods `Podfile.lock` and the SPM `Package.resolved`. The "Verified on device"
+  table above is still measured against `2.16.5` for the packaging questions it covers;
+  what `2.17.1` has is live payment evidence, not a re-run of that table.
 - **Resolved: took `KhipuClientIOS 2.17.1`, not `2.17.0`.** We held at `2.16.6` because
   `2.17.0` fixed two real defects — denying the location permission used to end the
   operation and return to the merchant's app, and any CoreLocation failure used to leave
