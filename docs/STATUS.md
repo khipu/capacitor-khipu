@@ -101,11 +101,23 @@ When it lands, in order:
    place this version lives on either line. (`verify:versions` covers only the iOS pair,
    `Package.swift` against the podspec; Android has no second file to drift from.)
 2. **Verify the fix in the bytecode, not by running it.** This is a race: a payment that
-   does not crash is not evidence of anything. What counts is that `cache` stops being a
-   plain `java.util.HashSet` — `javap -p -c` on `KhipuCookieJar.class` should show a
-   concurrent collection (e.g. `ConcurrentHashMap.newKeySet`) or a non-zero
-   `monitorenter` count around the iteration. If it still shows `new java/util/HashSet`
-   with zero `monitorenter`, the fix did not land, whatever the release notes say.
+   does not crash is not evidence of anything. The fix (IKW-1247) is `@Synchronized` on
+   `saveFromResponse` and `loadForRequest`, so **look for the method flag, not for
+   `monitorenter`**:
+
+   ```bash
+   javap -p com/khipu/client/socket/KhipuCookieJar.class | grep synchronized
+   # -> public synchronized void saveFromResponse(...)
+   # -> public synchronized java.util.List<okhttp3.Cookie> loadForRequest(...)
+   ```
+
+   A method-level `synchronized` sets `ACC_SYNCHRONIZED` in the descriptor and emits no
+   `monitorenter` at all — only `synchronized (x) { }` blocks do. Verified directly with
+   a probe class: `javap -p` prints `synchronized` in the signature, while the
+   `monitorenter` count stays at zero. So **the marker that diagnosed this bug gives a
+   false negative on its fix**, and so does "is `cache` still a `HashSet`" — it still is,
+   deliberately, because the lock also covers a `size`/iterate inconsistency in
+   `persistToDisk` that a concurrent set would not.
 3. `npm run verify` and `npm run lint` on both lines.
 4. Re-run the device validations, **Android first** — it is the platform whose SDK
    changed. The drivers now mint a random amount per payment; do not undo that, or the
@@ -405,20 +417,29 @@ keys are gone, not nulled — `{"exitUrl":"https://…","events":[…],"operatio
 no `continueUrl` or `failureReason` entry. The two lines agree with each other on each
 platform, and now the platforms agree with each other.
 
-**What these runs do not establish.** Nothing about settlement, in either direction.
+**What these runs do not establish.** Nothing about settlement for three of the six.
 All six were minted at the same amount (1000 CLP), and DemoBank reconciles by **amount +
-payer RUT** — the test RUT is constant, so the amount is the only discriminator. Held
-fixed, the six are indistinguishable to reconciliation. Three sat at `verifying`/`pending`
-for hours. Of the three that reached `done`, **two carry the identical
-`authorizer_operation_code`** (`c47b313cdd8fc16126ca71db5adecf14`) despite being
-different payments, on different platforms, with different transaction ids and different
-receipts — one bank authorisation credited to two records, so at least one of those
-greens is false. A third payment with the same amount and RUT has a different code, so
-this is misattribution rather than a code that simply does not discriminate.
+payer RUT** — the test RUT is constant, so the amount is the only discriminator, and we
+held it fixed. Three reached `done` with a `conciliation_date`; three sat at
+`verifying`/`pending` with none, hours later. A sibling session measured the same effect
+deliberately: an operation minted with a unique amount reconciled in 1 min 57 s. The
+drivers now mint a random amount per payment.
 
-`status` therefore carries no verdict on these runs. The drivers now mint a random amount
-per payment so that it can again. Measured 2026-09-12; the amount collision was raised by
-a sibling session hitting the same thing.
+**Do not read `authorizer_operation_code` as a per-payment authorisation.** It is a
+per-reconciliation-batch value. Across 14 operations spanning two projects, two
+platforms and two merchants, it took exactly **two** distinct values, grouped strictly
+by reconciliation date — our three `done` payments fall in those groups with everyone
+else's (one reconciled 2026-09-11T23:40Z, two on 2026-09-12 at 05:21Z and 06:01Z). This
+document previously read our two same-day payments sharing a value as one bank
+authorisation credited to two records, and concluded one of those greens was false. That
+was wrong. Its absence means nothing either: a sibling session has an operation that
+reached `done`/`normal` without the field at all. **`status` plus `conciliation_date` is
+the only thing that says a payment completed.**
+
+The cardinality is the lesson: the field looks unique — 32 hex characters, shaped like a
+digest — and with a three-payment sample a batch value is indistinguishable from a
+collision bug. Count the distinct values over a wide sample before reading meaning into
+one.
 
 None of this touches the key measurement, which comes from the `KhipuResult` the bridge
 handed back — the SDK reported `result: "OK"` with the exit screen the payer saw — and
