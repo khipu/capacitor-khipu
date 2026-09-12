@@ -460,13 +460,18 @@ called one of those greens false. That was wrong. Its absence means nothing eith
 sibling session has an operation that reached `done`/`normal` without the field at all.
 Whether the window is the calendar day or one batch run was never measured.
 
-**A third thing that looks authoritative and is not: the amount on DemoBank's screen.**
-It shows **90% of the amount minted** — `round(amount * 0.9)` reproduces it exactly across
-eight payments in two projects (five of them ours, 8407→7566, 3105→2794, 3237→2913,
-8082→7274, 7804→7024). Why is unmeasured and does not matter; what matters is not reading
-that number as "the payer paid what we minted". With random amounts it is an easy false
-red, precisely because nobody has the figure memorised any more. The authoritative amount
-is `GET /v3/payments/{id}` → `amount`.
+**The amount on DemoBank's screen is not the amount minted, and that is correct.** This
+test merchant is configured with a **10% discount**, applied server-side, so the screen
+shows what the payer actually pays: `round(amount * 0.9)` reproduces it exactly across
+nine payments in three projects (five of them ours: 8407→7566, 3105→2794, 3237→2913,
+8082→7274, 7804→7024).
+
+Unlike the two fields above, this one misleads nobody — it is right, and it answers a
+different question: what the payer pays, not what was minted. An earlier version of this
+document filed it alongside them as "a third thing that looks authoritative and is not",
+which was wrong. The operational point is narrower: a harness must not compare that
+number against the minted amount as though they should match. Compare against
+`round(amount * 0.9)`, or do not compare it at all.
 
 The cardinality is the lesson: 32 hex characters look unique, and on a three-payment
 sample a batch value is indistinguishable from a collision bug. Count the distinct values
