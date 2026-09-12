@@ -1,13 +1,14 @@
 # Status
 
-**Last updated:** 2026-09-11 — `plugin-hardening` branch, Android SDK bumped to
-`2.28.4` and iOS SDK to `2.17.1`, local verification complete, CI pending a push.
+**Last updated:** 2026-09-12 — hardening pass merged to `main` (PR #11), plus the iOS
+null-key alignment. Android SDK `2.28.4`, iOS SDK `2.17.1`. Verified locally and on
+device; not yet published.
 
 This is the entry point for picking up plugin work without prior context. The design
 and plan for a pass in progress are kept next to it while it is being worked, and are
 not retained once it lands — this document, not those files, is the durable record.
 
-## Plugin hardening pass (`plugin-hardening` branch, not yet pushed)
+## Plugin hardening pass (merged to `main` in PR #11)
 
 Twelve tasks changed TypeScript, Swift, Java, the three guard scripts, the podspec and CI.
 What landed:
@@ -81,9 +82,106 @@ against by checking for the binary separately in the `ios` job. **A green `npm r
 lint` on this machine is not evidence the Swift is clean** — nothing has reviewed it.
 Swift lint coverage for this branch comes from CI only.
 
-**The version to publish is `4.1.0`.** Publishing is not done here: `npm publish` needs
-a human with 2FA, and pushing the branch (or opening the PR, or merging) is the user's
-call, not something run as part of this pass.
+**The versions to publish are `8.0.0` on `main` and `7.0.0` on `7.x`.** From now on the
+plugin's major matches the Capacitor major it supports, so the lines are `8.x` and `7.x`
+rather than `4.x` and `3.x`.
+
+That is a decision (2026-09-12), not a whim. The old scheme gave each line exactly one
+major, so a breaking change *inside* a line had nowhere to go: this pass wanted `5.0.0`
+for `main` and `4.0.0` for `7.x`, and **`4.0.0` is already published** — it is `main`'s
+current release, and npm versions are global to the package, not per dist-tag. An earlier
+version of this document prescribed exactly that impossible pair. Tying the major to
+Capacitor's own removes the ceiling permanently and makes the number say which Capacitor
+it is for. Publishing is not done here: `npm publish` needs a human with 2FA.
+
+**The gate is lifted: `khipu-client-android 2.28.5` ships the `KhipuCookieJar` fix, and
+both lines are on it.** The release was held rather than publish a version carrying a
+crash that kills the merchant's process and cannot be contained from here (decided
+2026-09-12). Steps 1-3 below are done; what remains is the device re-validation and the
+publish itself.
+
+1. ~~Bump `com.khipu:khipu-client-android` in `android/build.gradle`~~ — done, `2.28.5`
+   on both lines. One line each, the only place this version lives. (`verify:versions`
+   covers only the iOS pair, `Package.swift` against the podspec; Android has no second
+   file to drift from.)
+2. ~~**Verify the fix in the artefact, not by running it.**~~ Done, and worth keeping as
+   the method. This is a race: a payment that does not crash proves nothing. The fix
+   (IKW-1247) is `@Synchronized` on `saveFromResponse` and `loadForRequest`, so **look
+   for the method flag, not for `monitorenter`**:
+
+   ```bash
+   # en el AAR publicado
+   javap -p com/khipu/client/socket/KhipuCookieJar.class | grep synchronized
+   #  -> public synchronized void saveFromResponse(...)
+   #  -> public synchronized java.util.List<okhttp3.Cookie> loadForRequest(...)
+   javap -c -p com/khipu/client/socket/KhipuCookieJar.class | grep -c monitorenter
+   #  -> 0. ESPERADO. No significa que falte el arreglo.
+   ```
+
+   A method-level `synchronized` sets `ACC_SYNCHRONIZED` in the descriptor and emits no
+   `monitorenter` at all — only `synchronized (x) { }` blocks do. Verified with a probe
+   class before trusting it. So **the marker that diagnosed this bug reports a false
+   negative on its fix**, and so does "is `cache` still a `HashSet`" — it deliberately
+   still is, because the lock also covers a `size`-then-iterate window in `persistToDisk`
+   that a concurrent set would not close.
+
+   **And verify the packaged APK, not `build.gradle`.** Five SDK versions shipped in
+   three days; packaging a stale one is a live risk. The same marker does the job, via
+   `dexdump`, because `2.28.4`'s copy of the class is not synchronized:
+
+   ```
+   dexdump classes*.dex  ->  KhipuCookieJar.saveFromResponse  0x20001 (PUBLIC DECLARED_SYNCHRONIZED)
+                             KhipuCookieJar.loadForRequest    0x20001 (PUBLIC DECLARED_SYNCHRONIZED)
+                             KhipuCookieJar.persistToDisk     0x0012  (PRIVATE FINAL)
+   ```
+
+   That last row is the control: the check is not reporting "synchronized" for
+   everything. Confirmed in both apps' APKs.
+
+   **Negative control, which matters more:** run the same marker against the versions
+   that do *not* have the fix and it must come back empty. It does — `2.28.3` and
+   `2.28.4` report zero `synchronized` methods on that class, `2.28.5` reports two. So
+   the marker distinguishes fixed from unfixed, rather than merely matching something.
+3. ~~`npm run verify` and `npm run lint` on both lines.~~ Both green, `2.28.5` resolved on
+   `releaseRuntimeClasspath`. No regression on the `2.28.4` fix this dependency was taken
+   for: `SocketMessageGuardKt` still calls `returnToApp`, `setUnprocessableMessage`,
+   `setOperationFinished` and `disconnectClient`, with a nonexistent-method control at 0.
+
+4. ~~**Re-run the device validations, Android first.**~~ **Done for `2.28.5`, on both
+   lines**, driven by hand. Both returned exactly what iOS now returns:
+
+   ```
+   KHIPU_RESULT_KEYS ["operationId","exitTitle","exitMessage","result","exitUrl","events"]
+   KHIPU_RESULT_RESULT OK
+   ```
+
+   Six keys, `continueUrl` and `failureReason` absent, 22 events ending in `succeeded`,
+   no crash. Both payments reached `done`/`normal`.
+
+   **Why the automated driver kept failing, which is worth knowing before rebuilding it:**
+   uiautomator reports a button's bounds even when the soft keyboard covers them, so
+   tapping those coordinates types a character into the focused field instead of pressing
+   the button. That is the whole mystery of the 15-character password — four characters
+   plus one per retry of a loop that could never succeed. **Dismiss the keyboard
+   (`KEYCODE_BACK`) before tapping any control that sits below a text field.** And
+   `adb input text` *appends*: clear the field first, always.
+
+   The live screen order is **email → bank → login → account → coordinates → authorise**.
+   The bank picker needs no search — DemoBank is already listed, and typing into the
+   search box is what made an earlier label lookup match the box instead of the row. The
+   coordinates are printed on screen ("Usa: 11-22-33"); read them there, never from
+   `.env`.
+
+   **And one that nearly invalidated the run:** the Cap 7 emulator was running a stale
+   build reporting `v2.28.3`. The APK had been rebuilt but never installed — the driver
+   only ever installed Cap 8's. Caught because the SDK renders its own version in the
+   screen footer. Check the version the app *reports*, not the one you built.
+5. Publish `8.0.0` from `main` and `7.0.0` from `7.x`, both majors for the iOS null-key
+   alignment already in these branches. Each line's release-it config lives in its own
+   `package.json` and already carries the right `requireBranch` and dist-tag (`latest`
+   for `main`, `cap7` for `7.x`), so no `--npm.tag` on the command line. The increment is
+   explicit — `release-it 8.0.0` / `release-it 7.0.0` — because `major` alone would land
+   on `5.0.0` and `4.0.0`, and `4.0.0` is taken.
 
 ## Published lines
 
@@ -92,8 +190,8 @@ single Capacitor 5 target into three lines: two maintained, one frozen.
 
 | Line | Branch        | Capacitor | iOS min | dist-tag | Version  |
 | ---- | ------------- | --------- | ------- | -------- | -------- |
-| 4.x  | `main`        | 8         | 15      | `latest` | `4.0.0`  |
-| 3.x  | `7.x`         | 7         | 14      | `cap7`   | `3.0.0`  |
+| 8.x  | `main`        | 8         | 15      | `latest` | `4.0.0`  |
+| 7.x  | `7.x`         | 7         | 14      | `cap7`   | `3.0.0`  |
 | 2.x  | `release/2.x` | 5 and 6   | 13      | `cap6`   | `2.11.3` |
 
 **Both maintained lines expose `Package.swift` and `CapacitorKhipu.podspec`**, so a
@@ -322,6 +420,79 @@ being true.
 credentials in this environment, so there is no `operationId`, so nothing past the
 plugin being wired in and callable was exercised.
 
+## End-to-end payments on device
+
+Real payments driven through the from-scratch doctest apps, against a production
+developer account whose only bank is DemoBank. Every row below is a payment the SDK
+carried to `result: "OK"` with the exit screen "¡Listo, transferiste!", so the key sets
+are comparable to each other one for one. All measured 2026-09-12.
+
+| line | platform | SDK | `Object.keys(result)` |
+| --- | --- | --- | --- |
+| Cap 8 | iOS | `2.16.6` | 8 keys, `continueUrl`/`failureReason` present as `null` |
+| Cap 7 | iOS | `2.16.6` | 8 keys, both present as `null` |
+| Cap 7 | Android | `2.28.3` | 6 keys, both absent |
+| Cap 7 | iOS | `2.17.1` | 8 keys, both present as `null` |
+| Cap 8 | iOS | `2.17.1`, post-fix | **6 keys, both absent** |
+| Cap 7 | iOS | `2.17.1`, post-fix | **6 keys, both absent** |
+| Cap 8 | Android | `2.28.5` | **6 keys, both absent** |
+| Cap 7 | Android | `2.28.5` | **6 keys, both absent** |
+
+The last four rows are what this major is for (`8.0.0` on the 8.x line,
+`7.0.0` on the 7.x line): iOS now returns the same six keys Android
+returns, measured on a device rather than argued from source. The raw dump confirms the
+keys are gone, not nulled — `{"exitUrl":"https://…","events":[…],"operationId":…}` with
+no `continueUrl` or `failureReason` entry. The two lines agree with each other on each
+platform, and now the platforms agree with each other.
+
+**What these runs establish, and what they are not for.** The verdict is the SDK's own
+result, read from the driver log: all eight resolved `result: "OK"` with the exit screen
+the payer saw. That is what these runs measure — the bridge launches the SDK, the flow
+reaches its end, and the result comes back into the host language with the right shape.
+**Server-side reconciliation is not our gate** (decided 2026-09-12): the backend owns it,
+so do not poll `GET /v3/payments/{id}` for `status: done` before calling a box green.
+
+That matters because those fields are easy to lose days to. Three of the first six sat at
+`verifying` with no `conciliation_date` for hours, and the cause is real: all six were
+minted at 1000 CLP while several were in flight together, and reconciliation cannot tell
+concurrent operations apart when they share an amount — the test RUT is constant, so the
+amount is all that is left to distinguish them by. The supported claim is the narrow one,
+**concurrency plus a shared amount**, not "a repeated amount collides": a sibling project
+reuses 200 CLP across every test and sees no delay when nothing else is live. **Keep
+minting a random amount per payment regardless**, as the drivers now do — not as a
+verdict, but because it keeps each operation attributable to one box and removes the
+variable for free.
+
+**Two fields that look like verdicts and are not.** `authorizer_operation_code` is a
+per-reconciliation-batch value, not a per-payment authorisation: across 14 operations
+spanning two projects, two platforms and two merchants it took exactly **two** distinct
+values, grouped by reconciliation date. An earlier version of this document read two
+same-day payments sharing a value as one bank authorisation credited to two records, and
+called one of those greens false. That was wrong. Its absence means nothing either — a
+sibling session has an operation that reached `done`/`normal` without the field at all.
+Whether the window is the calendar day or one batch run was never measured.
+
+**The amount on DemoBank's screen is not the amount minted, and that is correct.** This
+test merchant is configured with a **10% discount**, applied server-side, so the screen
+shows what the payer actually pays: `round(amount * 0.9)` reproduces it exactly across
+nine payments in three projects (five of them ours: 8407→7566, 3105→2794, 3237→2913,
+8082→7274, 7804→7024).
+
+Unlike the two fields above, this one misleads nobody — it is right, and it answers a
+different question: what the payer pays, not what was minted. An earlier version of this
+document filed it alongside them as "a third thing that looks authoritative and is not",
+which was wrong. The operational point is narrower: a harness must not compare that
+number against the minted amount as though they should match. Compare against
+`round(amount * 0.9)`, or do not compare it at all.
+
+The cardinality is the lesson: 32 hex characters look unique, and on a three-payment
+sample a batch value is indistinguishable from a collision bug. Count the distinct values
+over a wide sample before reading meaning into one.
+
+None of this touches the key measurement, which comes from the `KhipuResult` the bridge
+handed back and not from reconciliation. Separately, **the web layer has never been
+exercised by a real payment**, and it is the most-changed code in this pass.
+
 ## Cross-SDK finding to report upstream
 
 **The two native SDKs disagree on the `locale` default.** When the merchant does not
@@ -345,16 +516,27 @@ it.
 
 ## Known pending
 
-- **Decide the canonical shape of an absent result field.** Measured, no longer open:
-  Capacitor's iOS bridge serialises `nil as Any` to JSON `null`
-  (`PluginCallResult.jsonRepresentation` → `JSONSerialization`), so iOS delivers
-  `exitUrl`, `continueUrl` and `failureReason` as `null` while Android omits them. The
-  published type is `string | undefined`, which `null` does not satisfy, so iOS is the
-  side breaking the declared contract. Aligning on "omit" is type-correct but changes
-  what existing iOS merchants receive, so it needs a decision rather than a patch.
-  Android SDK ticket `IKW-1233` will make `asJson()` emit nulls to match iOS; since our
-  reader omits nulls, that will not change the merchant-visible result and the
-  divergence will persist by our choice.
+- ~~**`khipu-client-android 2.28.4` carries a crash that kills the merchant's process.**~~
+  **Fixed in `2.28.5`; both lines are on it.**
+  `KhipuCookieJar.cache` is a plain `java.util.HashSet`, and the class contains no
+  synchronisation whatsoever — zero `monitorenter` in the disassembly of `2.28.3` and
+  `2.28.4` alike. Every HTTP response carrying a cookie reaches `saveFromResponse` on an
+  OkHttp Dispatcher thread, which iterates that set, adds to it, and then iterates it
+  again in `persistToDisk`, writing one `SharedPreferences` entry per element. So the
+  path races against *itself* whenever two responses land at once, which is ordinary for
+  OkHttp — it does not need a second caller to collide with. The thread holding the
+  iterator throws `ConcurrentModificationException`, uncaught on a background thread, so
+  no bridge can contain it: the merchant's app disappears. Observed firing twice in
+  ~700 ms on two Dispatcher threads with identical stacks during an Android run on
+  `2.28.3`. The `2.28.4` bytecode is unchanged in this respect, so shipping `2.28.4`
+  does not avoid it — the Cap 8 run on `2.28.4` simply did not lose the race. Reported upstream 2026-09-12 with the disassembly
+  evidence and a suggested fix. The SDK team went with method-level `@Synchronized` on
+  `saveFromResponse` and `loadForRequest` (IKW-1247) rather than a concurrent set,
+  because the lock also closes a `size`-then-iterate window in `persistToDisk` that a
+  concurrent collection would leave open. Verified in the published AAR and in both
+  doctest APKs — see "The gate is lifted" above for the marker, which is **not** the
+  `monitorenter` count that diagnosed the bug.
+
 - **Merchants need no manifest entry for `KhipuActivity`.** The AAR's own
   `AndroidManifest.xml` declares
   `<activity android:name="com.khipu.client.KhipuActivity" android:exported="false" …>`;
@@ -425,12 +607,12 @@ it.
     | `events` | empty |
 
     **This interacts with the boundary decision above.** `failureReason` arrives as an
-    explicit `null`, not absent and not `"USER_CANCELED"`. Our Android reader omits null
-    keys — the same reduction recorded in "Decide the canonical shape of an absent
-    result field" — so the merchant still sees the key absent rather than `null`. That
-    remains our deliberate choice, but it now reduces an explicit `null` rather than
-    standing in for a wrong label. A genuine cancellation still reports
-    `failureReason: "USER_CANCELED"`.
+    explicit `null` at the SDK layer, not absent and not `"USER_CANCELED"`. Both our
+    readers omit null keys as of 8.0.0 — see "Decide the canonical shape of an absent
+    result field" — so the merchant sees the key absent rather than `null`, and sees it
+    that way on either platform. That remains our deliberate choice, but it now reduces
+    an explicit `null` rather than standing in for a wrong label. A genuine cancellation
+    still reports `failureReason: "USER_CANCELED"`.
   - _The deserialisation itself_ is not hardened. Verified against protocol `1.0.60`:
     `forValue` declares `throws IOException`, there is `@JsonValue` and `@JsonCreator`
     but no `@JsonEnumDefaultValue`, the converter configures only
@@ -450,10 +632,11 @@ it.
   `releaseRuntimeClasspath`, plus the jar's own bytecode markers, not a device run.
   Re-verify on device before trusting that table for `2.28.4`, and before trusting the
   merchant-visible fields recorded above for the undecodable-terminal-message case.
-- **`KhipuClientIOS 2.17.1` has never been exercised at runtime here either.** "Verified
-  on device" above is against `2.16.5`; the evidence for `2.17.1` (by way of `2.16.6`)
-  is a clean `xcodebuild build` plus the package's own version pin, not a device run.
-  Re-verify on device before trusting that table for `2.17.1`.
+- **`KhipuClientIOS 2.17.1` has now been exercised at runtime**, in three real payments
+  on device (see "End-to-end payments on device"), resolved as `2.17.1` in both the
+  CocoaPods `Podfile.lock` and the SPM `Package.resolved`. The "Verified on device"
+  table above is still measured against `2.16.5` for the packaging questions it covers;
+  what `2.17.1` has is live payment evidence, not a re-run of that table.
 - **Resolved: took `KhipuClientIOS 2.17.1`, not `2.17.0`.** We held at `2.16.6` because
   `2.17.0` fixed two real defects — denying the location permission used to end the
   operation and return to the merchant's app, and any CoreLocation failure used to leave

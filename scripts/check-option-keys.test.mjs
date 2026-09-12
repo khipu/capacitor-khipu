@@ -49,7 +49,7 @@ function webSource({
 }
 
 /** Builds the seven source files backing the guard's surfaces. Each one can drift independently. */
-function fixture({ contract = OPTIONS, harness = OPTIONS, resolve = RESULT, androidResult = RESULT, web = {} } = {}) {
+function fixture({ contract = OPTIONS, harness = OPTIONS, iosResult = RESULT, androidResult = RESULT, web = {} } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'khipu-keys-'));
 
   const fields = (keys) => keys.map((k) => `  ${k}: string | undefined;`).join('\n');
@@ -88,18 +88,20 @@ function fixture({ contract = OPTIONS, harness = OPTIONS, resolve = RESULT, andr
       `export const COLOR_FIELDS = [\n${entries(COLORS)}\n];\n\nexport const PRESETS = [];\n`,
   );
 
-  const resolves = (keys) => keys.map((k) => `      "${k}": result.${k},`).join('\n');
+  // Both platforms build the result through the same `put(result, "key", ...)` shape,
+  // Swift's differing only by the `inout` ampersand, so one helper writes both fixtures
+  // exactly as one regex reads both sources.
+  const puts = (keys, ref) => keys.map((k) => `        put(${ref}, "${k}", source.get());`).join('\n');
   write(
     dir,
-    'ios/Sources/KhipuPlugin/KhipuPlugin.swift',
-    `func startOperation() {\n    call.resolve([\n${resolves(resolve)}\n    ])\n}\n`,
+    'ios/Sources/KhipuPlugin/KhipuResultReader.swift',
+    `enum KhipuResultReader {\n    static func read() -> [String: Any] {\n${puts(iosResult, '&result')}\n    }\n}\n`,
   );
 
-  const puts = (keys) => keys.map((k) => `        put(result, "${k}", source.get());`).join('\n');
   write(
     dir,
     'android/src/main/java/com/khipu/capacitor/KhipuResultReader.java',
-    `class KhipuResultReader {\n    static JSObject read() {\n${puts(androidResult)}\n    }\n}\n`,
+    `class KhipuResultReader {\n    static JSObject read() {\n${puts(androidResult, 'result')}\n    }\n}\n`,
   );
 
   write(dir, 'src/web.ts', webSource(web));
@@ -138,10 +140,10 @@ describe('check-option-keys', () => {
 
   it("fails naming the missing key and the extra one when iOS's result drifts", () => {
     const drifted = RESULT.map((k) => (k === 'exitTitle' ? 'exitTitleX' : k));
-    const result = run(fixture({ resolve: drifted }));
+    const result = run(fixture({ iosResult: drifted }));
 
     expect(result.code).toBe(1);
-    expect(result.output).toContain('KhipuPlugin.swift (result) drifted');
+    expect(result.output).toContain('KhipuResultReader.swift (result) drifted');
     expect(result.output).toContain('does not read/offer: exitTitle');
     expect(result.output).toContain('reads/offers extra: exitTitleX');
   });

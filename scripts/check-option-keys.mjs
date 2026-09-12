@@ -16,14 +16,17 @@
  * of letting it be silently dropped. The fifth and sixth surfaces are the result
  * direction, below.
  *
- * It also covers the way back (native → JS), on both platforms: the 8 keys with which
- * `KhipuPlugin.swift` builds the promise via `call.resolve([...])`, and the 8 keys with
- * which `KhipuResultReader.java` builds the same object via `put(result, "<key>", ...)`,
- * each checked against the `KhipuResult` interface. Android used to be exempt from this
- * half: it delegated the entire shape of the result to the SDK (`khipuResult.asJson()`),
- * which put the field names out of our source and out of this guard's reach. It now
- * builds the result key by key instead, for exactly this reason, so both halves of the
- * return path are covered the same way as the outbound one.
+ * It also covers the way back (native → JS): the 8 keys with which each platform's
+ * `KhipuResultReader` builds the object the merchant receives, checked against the
+ * `KhipuResult` interface. Both are read with one pattern, `put(result, "<key>", ...)`,
+ * because both now build the result through the same helper shape — Swift's differs
+ * only by the `inout` ampersand. That is not a coincidence worth preserving by accident:
+ * the two platforms disagreed about null keys for the whole life of the plugin, and
+ * writing them the same way is what makes a future divergence visible here.
+ *
+ * Android used to be exempt from this half, delegating the result's shape to the SDK
+ * (`khipuResult.asJson()`), which put the field names out of our source and out of this
+ * guard's reach. iOS used to build a dictionary literal inline in the launch closure.
  *
  * On fragility: this parses source with regular expressions. The failure direction is
  * the right one (the check breaks and someone looks, instead of passing while the
@@ -40,7 +43,7 @@ const CONTRACT = `${BASE}/src/definitions.ts`;
 const SWIFT = `${BASE}/ios/Sources/KhipuPlugin/KhipuOptionsMapper.swift`;
 const MAPPER = `${BASE}/android/src/main/java/com/khipu/capacitor/KhipuOptionsMapper.java`;
 const HARNESS = `${BASE}/example/src/js/fields.js`;
-const PLUGIN = `${BASE}/ios/Sources/KhipuPlugin/KhipuPlugin.swift`;
+const IOS_READER = `${BASE}/ios/Sources/KhipuPlugin/KhipuResultReader.swift`;
 const READER = `${BASE}/android/src/main/java/com/khipu/capacitor/KhipuResultReader.java`;
 const WEB = `${BASE}/src/web.ts`;
 
@@ -57,17 +60,11 @@ function interfaceKeys(source, name) {
   return keys(block[1], /^\s*(\w+)\s*[?:]/gm);
 }
 
-// The way back (native → JS): the keys with which iOS builds the promise the merchant
-// receives. Android's counterpart is `KhipuResultReader.java`, checked separately below
-// via its own `put(result, "<key>", ...)` calls.
-function resolveKeys(source) {
-  const block = source.match(/call\.resolve\(\[(.*?)\]\)/s);
-  if (!block) {
-    console.error(`Could not extract the \`call.resolve\` block from ${PLUGIN}. This guard's parser is out of date.`);
-    process.exit(1);
-  }
-  return keys(block[1], /"(\w+)":/g);
-}
+// The way back (native → JS), for both platforms. Swift writes `put(&result, ...)` and
+// Java `put(result, ...)`; the optional ampersand is the only difference. A reshaped
+// reader yields zero keys here, which the surface check below reports as every field
+// missing — loud, and in the right direction.
+const RESULT_KEYS = /\bput\(&?result, "(\w+)"/g;
 
 /** Keys inside an exported array literal, e.g. `export const WEB_UNSUPPORTED = [...]`. */
 function listed(source, name) {
@@ -133,8 +130,8 @@ const surfaces = [
     expected: colors,
     actual: keys(sections[1].split('export const PRESETS')[0], /key: '(\w+)'/g),
   },
-  { name: `${PLUGIN} (result)`, expected: result, actual: resolveKeys(read(PLUGIN)) },
-  { name: `${READER} (result)`, expected: result, actual: keys(read(READER), /\bput\(result, "(\w+)"/g) },
+  { name: `${IOS_READER} (result)`, expected: result, actual: keys(read(IOS_READER), RESULT_KEYS) },
+  { name: `${READER} (result)`, expected: result, actual: keys(read(READER), RESULT_KEYS) },
   { name: `${WEB} (options)`, expected: options, actual: new Set([...webReads, ...webUnsupported]) },
   { name: `${WEB} (colors)`, expected: colors, actual: new Set([...webReadsColors, ...webUnsupportedColors]) },
 ];
