@@ -88,6 +88,29 @@ merchants migrate once rather than twice. Publishing is not done here: `npm publ
 needs a human with 2FA, and pushing (or merging, or publishing) is the user's call, not
 something run as part of this pass.
 
+**Publishing is gated on `khipu-client-android` shipping the `KhipuCookieJar` fix**
+(see "Known pending"). Decided 2026-09-12: rather than publish a release that carries a
+crash which kills the merchant's process and cannot be contained from here, we wait for
+the fixed SDK, bump to it, re-run the validations, and publish then.
+
+When it lands, in order:
+
+1. Bump `com.khipu:khipu-client-android` in `android/build.gradle` — one line, the only
+   place this version lives on either line. (`verify:versions` covers only the iOS pair,
+   `Package.swift` against the podspec; Android has no second file to drift from.)
+2. **Verify the fix in the bytecode, not by running it.** This is a race: a payment that
+   does not crash is not evidence of anything. What counts is that `cache` stops being a
+   plain `java.util.HashSet` — `javap -p -c` on `KhipuCookieJar.class` should show a
+   concurrent collection (e.g. `ConcurrentHashMap.newKeySet`) or a non-zero
+   `monitorenter` count around the iteration. If it still shows `new java/util/HashSet`
+   with zero `monitorenter`, the fix did not land, whatever the release notes say.
+3. `npm run verify` and `npm run lint` on both lines.
+4. Re-run the device validations, **Android first** — it is the platform whose SDK
+   changed. The drivers now mint a random amount per payment; do not undo that, or the
+   verdicts are worthless (see "End-to-end payments on device").
+5. Publish `5.0.0` on the 4.x line and `4.0.0` on the 3.x line, both majors for the iOS
+   null-key alignment already in these branches.
+
 ## Published lines
 
 The iOS SDK moved from CocoaPods to Swift Package Manager, and the plugin split from a
@@ -403,8 +426,12 @@ it.
   no bridge can contain it: the merchant's app disappears. Observed firing twice in
   ~700 ms on two Dispatcher threads with identical stacks during an Android run on
   `2.28.3`. The `2.28.4` bytecode is unchanged in this respect, so shipping `2.28.4`
-  does not avoid it — the Cap 8 run on `2.28.4` simply did not lose the race. Reported
-  upstream; no fixed version yet.
+  does not avoid it — the Cap 8 run on `2.28.4` simply did not lose the race. Reported upstream
+  2026-09-12 with the disassembly evidence and a suggested fix (`ConcurrentHashMap.newKeySet()`,
+  noting that `Collections.synchronizedSet` does *not* make the iteration safe). The
+  Android SDK team is preparing a release that corrects it, and **this plugin's next
+  publish waits for that version** rather than shipping the crash — see "The version to
+  publish" above.
 - **Merchants need no manifest entry for `KhipuActivity`.** The AAR's own
   `AndroidManifest.xml` declares
   `<activity android:name="com.khipu.client.KhipuActivity" android:exported="false" …>`;
