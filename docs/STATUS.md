@@ -138,10 +138,35 @@ publish itself.
    for: `SocketMessageGuardKt` still calls `returnToApp`, `setUnprocessableMessage`,
    `setOperationFinished` and `disconnectClient`, with a nonexistent-method control at 0.
 
-4. Re-run the device validations, **Android first** — it is the platform whose SDK
+4. **Re-run the device validations, Android first** — it is the platform whose SDK
    changed. The verdict is the SDK's own `result: "OK"` in the driver log, not
    `GET /v3/payments/{id}`; do not add a wait for reconciliation. Keep the random amount
    the drivers mint (see "End-to-end payments on device").
+
+   **Not done for `2.28.5`, and the blocker is our harness, not the SDK.**
+   `drive_payment.py` was never an unattended driver: it shipped with the login submit
+   unimplemented ("exact button label unknown") and the coordinates step a `TODO`, so the
+   earlier Android runs were driven by hand. Its fixed screen sequence had also gone
+   stale — the live flow is **email → bank picker → account → login → authorise**, and
+   the first two screens were absent from it entirely. Four real defects were fixed on
+   2026-09-12 (the email screen, the bank picker, a label search that matched the
+   `EditText` we had just typed into and so tapped the search box instead of the bank
+   row, and a matcher reading a 300-char *truncated* diagnostic string instead of the
+   tree). It now reaches the bank login screen and stops there: `input text` appends
+   rather than replaces, so a retry loop re-types into a filled field until the form
+   rejects it with "Value can not be more than 10 characters".
+
+   Finishing it means porting the iOS driver's design — `Drive.swift` completes payments
+   precisely because it is a screen-driven loop that reacts to whatever is on screen
+   instead of assuming an order. That is its own task, not part of a release.
+
+   **What stands in for it on `2.28.5`:** the fix verified in the published AAR and in
+   both packaged APKs (step 2), `./gradlew clean build test` green against `2.28.5` on
+   both lines, and the flow observed live on a device reaching the bank login screen with
+   the SDK rendering `v2.28.5` on its own footer — email, bank selection and account
+   selection all responding. Unverified is the last stretch: login submit through to the
+   returned `KhipuResult`. Note that a device run could never have confirmed the
+   cookie-jar fix anyway — it is a race, and not losing it once proves nothing.
 5. Publish `5.0.0` on the 4.x line and `4.0.0` on the 3.x line, both majors for the iOS
    null-key alignment already in these branches.
 
