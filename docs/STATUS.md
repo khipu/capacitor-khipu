@@ -414,47 +414,19 @@ it.
 ## Known pending
 
 - **`khipu-client-android 2.28.4` carries a crash that kills the merchant's process.**
-  `KhipuCookieJar.persistToDisk` iterates an unsynchronised `HashSet` that three
-  OkHttp-thread paths mutate, throwing `ConcurrentModificationException`. Observed
-  firing twice in 700 ms with identical stacks during an Android run on `2.28.3`, and
-  the SDK team confirmed the same code is still present in `2.28.4` — the version both
-  lines ship. It is an uncaught exception on a background thread, so no bridge can
-  catch it and there is nothing this plugin can do to contain it: the merchant's app
-  disappears. Reported upstream; no fixed version yet.
-- ~~**Decide the canonical shape of an absent result field.**~~ **Decided and done in
-  5.0.0: both platforms omit.** iOS was the side breaking the declared
-  `string | undefined`, and the cause was ours, not Capacitor's: `result.exitUrl as Any`
-  on an empty Swift optional does not produce nil, it produces an `Any` wrapping the
-  empty optional, so the key was written and the bridge serialised it as `null`. That
-  cast dated from the plugin's first commit. The payload now goes through
-  `KhipuResultReader.swift`, mirroring the Java reader, and `check-option-keys.mjs`
-  reads both with one pattern so they cannot drift apart again silently.
-
-  It is a breaking change for iOS merchants — `'k' in result`, `=== null`,
-  `Object.keys` and `JSON.stringify` all change — and **TypeScript does not flag
-  `=== null` against `string | undefined`** (verified against `tsc --strict` with a
-  positive control), so the compiler will not find these for merchants. Hence the major.
-
-  Android SDK ticket `IKW-1233` will make `asJson()` emit nulls to match what iOS used
-  to do; since both readers now omit nulls, it does not change the merchant-visible
-  result either way.
-- ~~**Decide the canonical shape of an absent result field.**~~ **Decided and done in
-  4.0.0: both platforms omit.** iOS was the side breaking the declared
-  `string | undefined`, and the cause was ours, not Capacitor's: `result.exitUrl as Any`
-  on an empty Swift optional does not produce nil, it produces an `Any` wrapping the
-  empty optional, so the key was written and the bridge serialised it as `null`. That
-  cast dated from the plugin's first commit. The payload now goes through
-  `KhipuResultReader.swift`, mirroring the Java reader, and `check-option-keys.mjs`
-  reads both with one pattern so they cannot drift apart again silently.
-
-  It is a breaking change for iOS merchants — `'k' in result`, `=== null`,
-  `Object.keys` and `JSON.stringify` all change — and **TypeScript does not flag
-  `=== null` against `string | undefined`** (verified against `tsc --strict` with a
-  positive control), so the compiler will not find these for merchants. Hence the major.
-
-  Android SDK ticket `IKW-1233` will make `asJson()` emit nulls to match what iOS used
-  to do; since both readers now omit nulls, it does not change the merchant-visible
-  result either way.
+  `KhipuCookieJar.cache` is a plain `java.util.HashSet`, and the class contains no
+  synchronisation whatsoever — zero `monitorenter` in the disassembly of `2.28.3` and
+  `2.28.4` alike. Every HTTP response carrying a cookie reaches `saveFromResponse` on an
+  OkHttp Dispatcher thread, which iterates that set, adds to it, and then iterates it
+  again in `persistToDisk`, writing one `SharedPreferences` entry per element. So the
+  path races against *itself* whenever two responses land at once, which is ordinary for
+  OkHttp — it does not need a second caller to collide with. The thread holding the
+  iterator throws `ConcurrentModificationException`, uncaught on a background thread, so
+  no bridge can contain it: the merchant's app disappears. Observed firing twice in
+  ~700 ms on two Dispatcher threads with identical stacks during an Android run on
+  `2.28.3`. The `2.28.4` bytecode is unchanged in this respect, so shipping `2.28.4`
+  does not avoid it — the Cap 8 run on `2.28.4` simply did not lose the race. Reported
+  upstream; no fixed version yet.
 - **Merchants need no manifest entry for `KhipuActivity`.** The AAR's own
   `AndroidManifest.xml` declares
   `<activity android:name="com.khipu.client.KhipuActivity" android:exported="false" …>`;
