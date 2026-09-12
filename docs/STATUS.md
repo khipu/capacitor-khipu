@@ -348,13 +348,25 @@ keys are gone, not nulled — `{"exitUrl":"https://…","events":[…],"operatio
 no `continueUrl` or `failureReason` entry. The two lines agree with each other on each
 platform, and now the platforms agree with each other.
 
-**What these runs do not establish.** Three of the six reached `status: done` via
-`GET /v3/payments/{id}`. The rest were still `verifying`/`pending` well after the fact,
-one of them hours later. That is a settlement state on Khipu's side, reached long after
-the SDK reports success and the plugin resolves, so it cannot affect the key
-measurement — but it does mean these runs do not prove the money settled. Separately,
-**the web layer has never been exercised by a real payment**, and it is the
-most-changed code in this pass.
+**What these runs do not establish.** Nothing about settlement, in either direction.
+All six were minted at the same amount (1000 CLP), and DemoBank reconciles by **amount +
+payer RUT** — the test RUT is constant, so the amount is the only discriminator. Held
+fixed, the six are indistinguishable to reconciliation. Three sat at `verifying`/`pending`
+for hours. Of the three that reached `done`, **two carry the identical
+`authorizer_operation_code`** (`c47b313cdd8fc16126ca71db5adecf14`) despite being
+different payments, on different platforms, with different transaction ids and different
+receipts — one bank authorisation credited to two records, so at least one of those
+greens is false. A third payment with the same amount and RUT has a different code, so
+this is misattribution rather than a code that simply does not discriminate.
+
+`status` therefore carries no verdict on these runs. The drivers now mint a random amount
+per payment so that it can again. Measured 2026-09-12; the amount collision was raised by
+a sibling session hitting the same thing.
+
+None of this touches the key measurement, which comes from the `KhipuResult` the bridge
+handed back — the SDK reported `result: "OK"` with the exit screen the payer saw — and
+not from reconciliation. Separately, **the web layer has never been exercised by a real
+payment**, and it is the most-changed code in this pass.
 
 ## Cross-SDK finding to report upstream
 
