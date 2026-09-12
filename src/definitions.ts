@@ -247,7 +247,7 @@ export interface KhipuResult {
    * check it before using it.
    *
    * When there is none, both native platforms omit the key, so it reads as
-   * `undefined`. Until 5.0.0 iOS sent an explicit JSON `null` instead — see the
+   * `undefined`. Until 8.0.0 iOS sent an explicit JSON `null` instead — see the
    * breaking change in the README.
    */
   exitUrl: string | undefined;
@@ -267,7 +267,7 @@ export interface KhipuResult {
    * here would go stale silently.
    *
    * When there is none, both native platforms omit the key, so it reads as
-   * `undefined`. Until 5.0.0 iOS sent an explicit JSON `null` instead.
+   * `undefined`. Until 8.0.0 iOS sent an explicit JSON `null` instead.
    */
   failureReason: string | undefined;
   /**
@@ -277,7 +277,7 @@ export interface KhipuResult {
    * other `result` value.
    *
    * When there is none, both native platforms omit the key, so it reads as
-   * `undefined`. Until 5.0.0 iOS sent an explicit JSON `null` instead.
+   * `undefined`. Until 8.0.0 iOS sent an explicit JSON `null` instead.
    */
   continueUrl: string | undefined;
   /**
