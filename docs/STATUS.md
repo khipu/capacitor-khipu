@@ -143,35 +143,35 @@ publish itself.
    for: `SocketMessageGuardKt` still calls `returnToApp`, `setUnprocessableMessage`,
    `setOperationFinished` and `disconnectClient`, with a nonexistent-method control at 0.
 
-4. **Re-run the device validations, Android first** — it is the platform whose SDK
-   changed. The verdict is the SDK's own `result: "OK"` in the driver log, not
-   `GET /v3/payments/{id}`; do not add a wait for reconciliation. Keep the random amount
-   the drivers mint (see "End-to-end payments on device").
+4. ~~**Re-run the device validations, Android first.**~~ **Done for `2.28.5`, on both
+   lines**, driven by hand. Both returned exactly what iOS now returns:
 
-   **Not done for `2.28.5`, and the blocker is our harness, not the SDK.**
-   `drive_payment.py` was never an unattended driver: it shipped with the login submit
-   unimplemented ("exact button label unknown") and the coordinates step a `TODO`, so the
-   earlier Android runs were driven by hand. Its fixed screen sequence had also gone
-   stale — the live flow is **email → bank picker → account → login → authorise**, and
-   the first two screens were absent from it entirely. Four real defects were fixed on
-   2026-09-12 (the email screen, the bank picker, a label search that matched the
-   `EditText` we had just typed into and so tapped the search box instead of the bank
-   row, and a matcher reading a 300-char *truncated* diagnostic string instead of the
-   tree). It now reaches the bank login screen and stops there: `input text` appends
-   rather than replaces, so a retry loop re-types into a filled field until the form
-   rejects it with "Value can not be more than 10 characters".
+   ```
+   KHIPU_RESULT_KEYS ["operationId","exitTitle","exitMessage","result","exitUrl","events"]
+   KHIPU_RESULT_RESULT OK
+   ```
 
-   Finishing it means porting the iOS driver's design — `Drive.swift` completes payments
-   precisely because it is a screen-driven loop that reacts to whatever is on screen
-   instead of assuming an order. That is its own task, not part of a release.
+   Six keys, `continueUrl` and `failureReason` absent, 22 events ending in `succeeded`,
+   no crash. Both payments reached `done`/`normal`.
 
-   **What stands in for it on `2.28.5`:** the fix verified in the published AAR and in
-   both packaged APKs (step 2), `./gradlew clean build test` green against `2.28.5` on
-   both lines, and the flow observed live on a device reaching the bank login screen with
-   the SDK rendering `v2.28.5` on its own footer — email, bank selection and account
-   selection all responding. Unverified is the last stretch: login submit through to the
-   returned `KhipuResult`. Note that a device run could never have confirmed the
-   cookie-jar fix anyway — it is a race, and not losing it once proves nothing.
+   **Why the automated driver kept failing, which is worth knowing before rebuilding it:**
+   uiautomator reports a button's bounds even when the soft keyboard covers them, so
+   tapping those coordinates types a character into the focused field instead of pressing
+   the button. That is the whole mystery of the 15-character password — four characters
+   plus one per retry of a loop that could never succeed. **Dismiss the keyboard
+   (`KEYCODE_BACK`) before tapping any control that sits below a text field.** And
+   `adb input text` *appends*: clear the field first, always.
+
+   The live screen order is **email → bank → login → account → coordinates → authorise**.
+   The bank picker needs no search — DemoBank is already listed, and typing into the
+   search box is what made an earlier label lookup match the box instead of the row. The
+   coordinates are printed on screen ("Usa: 11-22-33"); read them there, never from
+   `.env`.
+
+   **And one that nearly invalidated the run:** the Cap 7 emulator was running a stale
+   build reporting `v2.28.3`. The APK had been rebuilt but never installed — the driver
+   only ever installed Cap 8's. Caught because the SDK renders its own version in the
+   screen footer. Check the version the app *reports*, not the one you built.
 5. Publish `5.0.0` on the 4.x line and `4.0.0` on the 3.x line, both majors for the iOS
    null-key alignment already in these branches.
 
@@ -459,8 +459,10 @@ are comparable to each other one for one. All measured 2026-09-12.
 | 3.x (Cap 7) | iOS | `2.17.1` | 8 keys, both present as `null` |
 | 4.x (Cap 8) | iOS | `2.17.1`, post-fix | **6 keys, both absent** |
 | 3.x (Cap 7) | iOS | `2.17.1`, post-fix | **6 keys, both absent** |
+| 4.x (Cap 8) | Android | `2.28.5` | **6 keys, both absent** |
+| 3.x (Cap 7) | Android | `2.28.5` | **6 keys, both absent** |
 
-The last two rows are what this major is for (`5.0.0` on the 4.x line,
+The last four rows are what this major is for (`5.0.0` on the 4.x line,
 `4.0.0` on the 3.x line): iOS now returns the same six keys Android
 returns, measured on a device rather than argued from source. The raw dump confirms the
 keys are gone, not nulled — `{"exitUrl":"https://…","events":[…],"operationId":…}` with
@@ -468,13 +470,13 @@ no `continueUrl` or `failureReason` entry. The two lines agree with each other o
 platform, and now the platforms agree with each other.
 
 **What these runs establish, and what they are not for.** The verdict is the SDK's own
-result, read from the driver log: all six resolved `result: "OK"` with the exit screen
+result, read from the driver log: all eight resolved `result: "OK"` with the exit screen
 the payer saw. That is what these runs measure — the bridge launches the SDK, the flow
 reaches its end, and the result comes back into the host language with the right shape.
 **Server-side reconciliation is not our gate** (decided 2026-09-12): the backend owns it,
 so do not poll `GET /v3/payments/{id}` for `status: done` before calling a box green.
 
-That matters because those fields are easy to lose days to. Three of the six sat at
+That matters because those fields are easy to lose days to. Three of the first six sat at
 `verifying` with no `conciliation_date` for hours, and the cause is real: all six were
 minted at 1000 CLP while several were in flight together, and reconciliation cannot tell
 concurrent operations apart when they share an amount — the test RUT is constant, so the
