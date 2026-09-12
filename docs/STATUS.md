@@ -118,8 +118,9 @@ When it lands, in order:
    `persistToDisk` that a concurrent set would not.
 3. `npm run verify` and `npm run lint` on both lines.
 4. Re-run the device validations, **Android first** — it is the platform whose SDK
-   changed. The drivers now mint a random amount per payment; do not undo that, or the
-   verdicts are worthless (see "End-to-end payments on device").
+   changed. The verdict is the SDK's own `result: "OK"` in the driver log, not
+   `GET /v3/payments/{id}`; do not add a wait for reconciliation. Keep the random amount
+   the drivers mint (see "End-to-end payments on device").
 5. Publish `5.0.0` on the 4.x line and `4.0.0` on the 3.x line, both majors for the iOS
    null-key alignment already in these branches.
 
@@ -383,44 +384,40 @@ keys are gone, not nulled — `{"exitUrl":"https://…","events":[…],"operatio
 no `continueUrl` or `failureReason` entry. The two lines agree with each other on each
 platform, and now the platforms agree with each other.
 
-**What these runs do not establish.** Nothing about settlement for three of the six.
-All six were minted at the same amount (1000 CLP) while several were in flight together,
-and reconciliation appears unable to tell concurrent operations apart when they share an
-amount — the test RUT is constant, so the amount is the only thing left to distinguish
-them by. Three reached `done` with a `conciliation_date`; three sat at `verifying`/
-`pending` with none, hours later. A sibling session minting a single operation with a
-unique amount saw it reconcile in 1 min 57 s.
+**What these runs establish, and what they are not for.** The verdict is the SDK's own
+result, read from the driver log: all six resolved `result: "OK"` with the exit screen
+the payer saw. That is what these runs measure — the bridge launches the SDK, the flow
+reaches its end, and the result comes back into the host language with the right shape.
+**Server-side reconciliation is not our gate** (decided 2026-09-12): the backend owns it,
+so do not poll `GET /v3/payments/{id}` for `status: done` before calling a box green.
 
-The claim is deliberately the narrow one: **concurrency plus a shared amount**, not "a
-repeated amount collides". A sibling project reuses 200 CLP across all its tests and
-sees no delay when nothing else is live at the time. Reusing an amount is fine; several
-live operations sharing one is not. Our six are squarely in the bad case either way. The
-drivers now mint a random amount per payment, which removes the variable for free.
+That matters because those fields are easy to lose days to. Three of the six sat at
+`verifying` with no `conciliation_date` for hours, and the cause is real: all six were
+minted at 1000 CLP while several were in flight together, and reconciliation cannot tell
+concurrent operations apart when they share an amount — the test RUT is constant, so the
+amount is all that is left to distinguish them by. The supported claim is the narrow one,
+**concurrency plus a shared amount**, not "a repeated amount collides": a sibling project
+reuses 200 CLP across every test and sees no delay when nothing else is live. **Keep
+minting a random amount per payment regardless**, as the drivers now do — not as a
+verdict, but because it keeps each operation attributable to one box and removes the
+variable for free.
 
-**Do not read `authorizer_operation_code` as a per-payment authorisation.** It is a
-per-reconciliation-batch value. Across 14 operations spanning two projects, two
-platforms and two merchants, it took exactly **two** distinct values, grouped strictly
-by reconciliation date — our three `done` payments fall in those groups with everyone
-else's (one reconciled 2026-09-11T23:40Z, two on 2026-09-12 at 05:21Z and 06:01Z). This
-document previously read our two same-day payments sharing a value as one bank
-authorisation credited to two records, and concluded one of those greens was false. That
-was wrong. Its absence means nothing either: a sibling session has an operation that
-reached `done`/`normal` without the field at all. **`status` plus `conciliation_date` is
-the only thing that says a payment completed.**
+**Two fields that look like verdicts and are not.** `authorizer_operation_code` is a
+per-reconciliation-batch value, not a per-payment authorisation: across 14 operations
+spanning two projects, two platforms and two merchants it took exactly **two** distinct
+values, grouped by reconciliation date. An earlier version of this document read two
+same-day payments sharing a value as one bank authorisation credited to two records, and
+called one of those greens false. That was wrong. Its absence means nothing either — a
+sibling session has an operation that reached `done`/`normal` without the field at all.
+Whether the window is the calendar day or one batch run was never measured.
 
-Whether that window is the calendar day or a single batch run is **not** measured: the
-boundary falls between 2026-09-11T23:40:35Z and 2026-09-12T05:21:14Z, and no project
-involved has a sample in between.
-
-The cardinality is the lesson: the field looks unique — 32 hex characters, shaped like a
-digest — and with a three-payment sample a batch value is indistinguishable from a
-collision bug. Count the distinct values over a wide sample before reading meaning into
-one.
+The cardinality is the lesson: 32 hex characters look unique, and on a three-payment
+sample a batch value is indistinguishable from a collision bug. Count the distinct values
+over a wide sample before reading meaning into one.
 
 None of this touches the key measurement, which comes from the `KhipuResult` the bridge
-handed back — the SDK reported `result: "OK"` with the exit screen the payer saw — and
-not from reconciliation. Separately, **the web layer has never been exercised by a real
-payment**, and it is the most-changed code in this pass.
+handed back and not from reconciliation. Separately, **the web layer has never been
+exercised by a real payment**, and it is the most-changed code in this pass.
 
 ## Cross-SDK finding to report upstream
 
