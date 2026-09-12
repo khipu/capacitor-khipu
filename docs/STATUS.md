@@ -418,12 +418,18 @@ no `continueUrl` or `failureReason` entry. The two lines agree with each other o
 platform, and now the platforms agree with each other.
 
 **What these runs do not establish.** Nothing about settlement for three of the six.
-All six were minted at the same amount (1000 CLP), and DemoBank reconciles by **amount +
-payer RUT** — the test RUT is constant, so the amount is the only discriminator, and we
-held it fixed. Three reached `done` with a `conciliation_date`; three sat at
-`verifying`/`pending` with none, hours later. A sibling session measured the same effect
-deliberately: an operation minted with a unique amount reconciled in 1 min 57 s. The
-drivers now mint a random amount per payment.
+All six were minted at the same amount (1000 CLP) while several were in flight together,
+and reconciliation appears unable to tell concurrent operations apart when they share an
+amount — the test RUT is constant, so the amount is the only thing left to distinguish
+them by. Three reached `done` with a `conciliation_date`; three sat at `verifying`/
+`pending` with none, hours later. A sibling session minting a single operation with a
+unique amount saw it reconcile in 1 min 57 s.
+
+The claim is deliberately the narrow one: **concurrency plus a shared amount**, not "a
+repeated amount collides". A sibling project reuses 200 CLP across all its tests and
+sees no delay when nothing else is live at the time. Reusing an amount is fine; several
+live operations sharing one is not. Our six are squarely in the bad case either way. The
+drivers now mint a random amount per payment, which removes the variable for free.
 
 **Do not read `authorizer_operation_code` as a per-payment authorisation.** It is a
 per-reconciliation-batch value. Across 14 operations spanning two projects, two
@@ -435,6 +441,10 @@ authorisation credited to two records, and concluded one of those greens was fal
 was wrong. Its absence means nothing either: a sibling session has an operation that
 reached `done`/`normal` without the field at all. **`status` plus `conciliation_date` is
 the only thing that says a payment completed.**
+
+Whether that window is the calendar day or a single batch run is **not** measured: the
+boundary falls between 2026-09-11T23:40:35Z and 2026-09-12T05:21:14Z, and no project
+involved has a sample in between.
 
 The cardinality is the lesson: the field looks unique — 32 hex characters, shaped like a
 digest — and with a three-payment sample a batch value is indistinguishable from a
