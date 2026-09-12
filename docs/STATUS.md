@@ -462,14 +462,14 @@ are comparable to each other one for one. All measured 2026-09-12.
 
 | line | platform | SDK | `Object.keys(result)` |
 | --- | --- | --- | --- |
-| 4.x (Cap 8) | iOS | `2.16.6` | 8 keys, `continueUrl`/`failureReason` present as `null` |
-| 3.x (Cap 7) | iOS | `2.16.6` | 8 keys, both present as `null` |
-| 3.x (Cap 7) | Android | `2.28.3` | 6 keys, both absent |
-| 3.x (Cap 7) | iOS | `2.17.1` | 8 keys, both present as `null` |
-| 4.x (Cap 8) | iOS | `2.17.1`, post-fix | **6 keys, both absent** |
-| 3.x (Cap 7) | iOS | `2.17.1`, post-fix | **6 keys, both absent** |
-| 4.x (Cap 8) | Android | `2.28.5` | **6 keys, both absent** |
-| 3.x (Cap 7) | Android | `2.28.5` | **6 keys, both absent** |
+| Cap 8 | iOS | `2.16.6` | 8 keys, `continueUrl`/`failureReason` present as `null` |
+| Cap 7 | iOS | `2.16.6` | 8 keys, both present as `null` |
+| Cap 7 | Android | `2.28.3` | 6 keys, both absent |
+| Cap 7 | iOS | `2.17.1` | 8 keys, both present as `null` |
+| Cap 8 | iOS | `2.17.1`, post-fix | **6 keys, both absent** |
+| Cap 7 | iOS | `2.17.1`, post-fix | **6 keys, both absent** |
+| Cap 8 | Android | `2.28.5` | **6 keys, both absent** |
+| Cap 7 | Android | `2.28.5` | **6 keys, both absent** |
 
 The last four rows are what this major is for (`8.0.0` on the 8.x line,
 `7.0.0` on the 7.x line): iOS now returns the same six keys Android
