@@ -131,6 +131,11 @@ publish itself.
 
    That last row is the control: the check is not reporting "synchronized" for
    everything. Confirmed in both apps' APKs.
+
+   **Negative control, which matters more:** run the same marker against the versions
+   that do *not* have the fix and it must come back empty. It does — `2.28.3` and
+   `2.28.4` report zero `synchronized` methods on that class, `2.28.5` reports two. So
+   the marker distinguishes fixed from unfixed, rather than merely matching something.
 3. ~~`npm run verify` and `npm run lint` on both lines.~~ Both green, `2.28.5` resolved on
    `releaseRuntimeClasspath`. No regression on the `2.28.4` fix this dependency was taken
    for: `SocketMessageGuardKt` still calls `returnToApp`, `setUnprocessableMessage`,
@@ -454,6 +459,14 @@ same-day payments sharing a value as one bank authorisation credited to two reco
 called one of those greens false. That was wrong. Its absence means nothing either — a
 sibling session has an operation that reached `done`/`normal` without the field at all.
 Whether the window is the calendar day or one batch run was never measured.
+
+**A third thing that looks authoritative and is not: the amount on DemoBank's screen.**
+It shows **90% of the amount minted** — `round(amount * 0.9)` reproduces it exactly across
+eight payments in two projects (five of them ours, 8407→7566, 3105→2794, 3237→2913,
+8082→7274, 7804→7024). Why is unmeasured and does not matter; what matters is not reading
+that number as "the payer paid what we minted". With random amounts it is an easy false
+red, precisely because nobody has the figure memorised any more. The authoritative amount
+is `GET /v3/payments/{id}` → `amount`.
 
 The cardinality is the lesson: 32 hex characters look unique, and on a three-payment
 sample a batch value is indistinguishable from a collision bug. Count the distinct values
