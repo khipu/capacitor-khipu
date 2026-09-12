@@ -90,35 +90,54 @@ in here means merchants migrate once rather than twice. Publishing is not done h
 `npm publish` needs a human with 2FA, and pushing (or merging, or publishing) is the
 user's call, not something run as part of this pass.
 
-**Publishing is gated on `khipu-client-android` shipping the `KhipuCookieJar` fix**
-(see "Known pending"). Decided 2026-09-12: rather than publish a release that carries a
-crash which kills the merchant's process and cannot be contained from here, we wait for
-the fixed SDK, bump to it, re-run the validations, and publish then.
+**The gate is lifted: `khipu-client-android 2.28.5` ships the `KhipuCookieJar` fix, and
+both lines are on it.** The release was held rather than publish a version carrying a
+crash that kills the merchant's process and cannot be contained from here (decided
+2026-09-12). Steps 1-3 below are done; what remains is the device re-validation and the
+publish itself.
 
-When it lands, in order:
-
-1. Bump `com.khipu:khipu-client-android` in `android/build.gradle` — one line, the only
-   place this version lives on either line. (`verify:versions` covers only the iOS pair,
-   `Package.swift` against the podspec; Android has no second file to drift from.)
-2. **Verify the fix in the bytecode, not by running it.** This is a race: a payment that
-   does not crash is not evidence of anything. The fix (IKW-1247) is `@Synchronized` on
-   `saveFromResponse` and `loadForRequest`, so **look for the method flag, not for
-   `monitorenter`**:
+1. ~~Bump `com.khipu:khipu-client-android` in `android/build.gradle`~~ — done, `2.28.5`
+   on both lines. One line each, the only place this version lives. (`verify:versions`
+   covers only the iOS pair, `Package.swift` against the podspec; Android has no second
+   file to drift from.)
+2. ~~**Verify the fix in the artefact, not by running it.**~~ Done, and worth keeping as
+   the method. This is a race: a payment that does not crash proves nothing. The fix
+   (IKW-1247) is `@Synchronized` on `saveFromResponse` and `loadForRequest`, so **look
+   for the method flag, not for `monitorenter`**:
 
    ```bash
+   # en el AAR publicado
    javap -p com/khipu/client/socket/KhipuCookieJar.class | grep synchronized
-   # -> public synchronized void saveFromResponse(...)
-   # -> public synchronized java.util.List<okhttp3.Cookie> loadForRequest(...)
+   #  -> public synchronized void saveFromResponse(...)
+   #  -> public synchronized java.util.List<okhttp3.Cookie> loadForRequest(...)
+   javap -c -p com/khipu/client/socket/KhipuCookieJar.class | grep -c monitorenter
+   #  -> 0. ESPERADO. No significa que falte el arreglo.
    ```
 
    A method-level `synchronized` sets `ACC_SYNCHRONIZED` in the descriptor and emits no
-   `monitorenter` at all — only `synchronized (x) { }` blocks do. Verified directly with
-   a probe class: `javap -p` prints `synchronized` in the signature, while the
-   `monitorenter` count stays at zero. So **the marker that diagnosed this bug gives a
-   false negative on its fix**, and so does "is `cache` still a `HashSet`" — it still is,
-   deliberately, because the lock also covers a `size`/iterate inconsistency in
-   `persistToDisk` that a concurrent set would not.
-3. `npm run verify` and `npm run lint` on both lines.
+   `monitorenter` at all — only `synchronized (x) { }` blocks do. Verified with a probe
+   class before trusting it. So **the marker that diagnosed this bug reports a false
+   negative on its fix**, and so does "is `cache` still a `HashSet`" — it deliberately
+   still is, because the lock also covers a `size`-then-iterate window in `persistToDisk`
+   that a concurrent set would not close.
+
+   **And verify the packaged APK, not `build.gradle`.** Five SDK versions shipped in
+   three days; packaging a stale one is a live risk. The same marker does the job, via
+   `dexdump`, because `2.28.4`'s copy of the class is not synchronized:
+
+   ```
+   dexdump classes*.dex  ->  KhipuCookieJar.saveFromResponse  0x20001 (PUBLIC DECLARED_SYNCHRONIZED)
+                             KhipuCookieJar.loadForRequest    0x20001 (PUBLIC DECLARED_SYNCHRONIZED)
+                             KhipuCookieJar.persistToDisk     0x0012  (PRIVATE FINAL)
+   ```
+
+   That last row is the control: the check is not reporting "synchronized" for
+   everything. Confirmed in both apps' APKs.
+3. ~~`npm run verify` and `npm run lint` on both lines.~~ Both green, `2.28.5` resolved on
+   `releaseRuntimeClasspath`. No regression on the `2.28.4` fix this dependency was taken
+   for: `SocketMessageGuardKt` still calls `returnToApp`, `setUnprocessableMessage`,
+   `setOperationFinished` and `disconnectClient`, with a nonexistent-method control at 0.
+
 4. Re-run the device validations, **Android first** — it is the platform whose SDK
    changed. The verdict is the SDK's own `result: "OK"` in the driver log, not
    `GET /v3/payments/{id}`; do not add a wait for reconciliation. Keep the random amount
@@ -476,7 +495,8 @@ it.
 
 ## Known pending
 
-- **`khipu-client-android 2.28.4` carries a crash that kills the merchant's process.**
+- ~~**`khipu-client-android 2.28.4` carries a crash that kills the merchant's process.**~~
+  **Fixed in `2.28.5`; both lines are on it.**
   `KhipuCookieJar.cache` is a plain `java.util.HashSet`, and the class contains no
   synchronisation whatsoever — zero `monitorenter` in the disassembly of `2.28.3` and
   `2.28.4` alike. Every HTTP response carrying a cookie reaches `saveFromResponse` on an
@@ -488,12 +508,14 @@ it.
   no bridge can contain it: the merchant's app disappears. Observed firing twice in
   ~700 ms on two Dispatcher threads with identical stacks during an Android run on
   `2.28.3`. The `2.28.4` bytecode is unchanged in this respect, so shipping `2.28.4`
-  does not avoid it — the Cap 8 run on `2.28.4` simply did not lose the race. Reported upstream
-  2026-09-12 with the disassembly evidence and a suggested fix (`ConcurrentHashMap.newKeySet()`,
-  noting that `Collections.synchronizedSet` does *not* make the iteration safe). The
-  Android SDK team is preparing a release that corrects it, and **this plugin's next
-  publish waits for that version** rather than shipping the crash — see "The version to
-  publish" above.
+  does not avoid it — the Cap 8 run on `2.28.4` simply did not lose the race. Reported upstream 2026-09-12 with the disassembly
+  evidence and a suggested fix. The SDK team went with method-level `@Synchronized` on
+  `saveFromResponse` and `loadForRequest` (IKW-1247) rather than a concurrent set,
+  because the lock also closes a `size`-then-iterate window in `persistToDisk` that a
+  concurrent collection would leave open. Verified in the published AAR and in both
+  doctest APKs — see "The gate is lifted" above for the marker, which is **not** the
+  `monitorenter` count that diagnosed the bug.
+
 - **Merchants need no manifest entry for `KhipuActivity`.** The AAR's own
   `AndroidManifest.xml` declares
   `<activity android:name="com.khipu.client.KhipuActivity" android:exported="false" …>`;
