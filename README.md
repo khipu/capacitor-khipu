@@ -176,6 +176,10 @@ release behaved differently and `7.1.0` corrects it.
   `null` when the SDK has no value. The result object has the same eight keys whatever
   happened to the payment, which is what makes it safe to log and diff.
 
+  **If your app is iOS-only, there is nothing to do here.** iOS sent `null` on `3.x`
+  and sends `null` now — Android is the side that changed, and the rest of this bullet is
+  for it.
+
   What this breaks, on Android: `'continueUrl' in result` and `Object.keys(result)`
   change, `JSON.stringify(result)` gains the keys, and `result.continueUrl === undefined`
   stops being true. If you assigned one of these to a `string | undefined`, that no
