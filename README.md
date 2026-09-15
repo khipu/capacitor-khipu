@@ -161,28 +161,36 @@ unless you send `locale` explicitly.
 
 `result.exitUrl` can come back empty on real payments, so check it before using it.
 
-## Behaviour changes in 8.0.0
+## Behaviour changes in 8.x
 
-- **Breaking, iOS only: `exitUrl`, `continueUrl` and `failureReason` are now omitted
-  when the SDK has no value for them, instead of arriving as JSON `null`.** Android
-  already omitted them, and `KhipuResult` has always declared the three as
-  `string | undefined` — which `null` does not satisfy — so iOS was the side that
-  disagreed with both the other platform and the published type. The cause was a
-  `result.exitUrl as Any` cast: an empty Swift optional cast to `Any` is not nil, so
-  the key got written and the bridge serialised it as `null`. That cast had been there
-  since the plugin's first release.
+Coming from `4.x`. If you are already on `8.0.0`, read the last bullet — that one
+release behaved differently and `8.1.0` corrects it.
 
-  What breaks: `'continueUrl' in result`, `result.continueUrl === null`,
-  `Object.keys(result)` and `JSON.stringify(result)` all change on iOS. **TypeScript
-  will not find these for you** — `=== null` compiles cleanly against
-  `string | undefined` — so grep for them rather than trusting a green build.
+- **`exitUrl`, `continueUrl` and `failureReason` are now typed `string | null`, and the
+  key is always present.** On `4.x` they arrived as `null` on iOS and were *absent* on
+  Android; the two platforms disagreed. They now agree: the key is always there, holding
+  `null` when the SDK has no value. The result object has the same eight keys whatever
+  happened to the payment, which is what makes it safe to log and diff.
 
-  What starts working: `const { continueUrl = fallback } = result` applies the default
-  on iOS now. Defaults only fire on `undefined`, so the `null` silently defeated them
-  while Android honoured them.
+  What this breaks, on Android: `'continueUrl' in result` and `Object.keys(result)`
+  change, `JSON.stringify(result)` gains the keys, and `result.continueUrl === undefined`
+  stops being true. If you assigned one of these to a `string | undefined`, that no
+  longer compiles.
 
-  Reading with truthiness (`if (result.continueUrl)`) or `??` was correct before and is
-  correct now, on all platforms.
+  **TypeScript will not find the runtime cases for you.** `=== undefined` against
+  `string | null` compiles cleanly, exactly as `=== null` against `string | undefined`
+  did — the declared type only bites on assignment. Grep for `=== undefined`, `in` and
+  `Object.keys` rather than trusting a green build.
+
+  One footgun to know about: `const { continueUrl = fallback } = result` does **not**
+  apply the default, because destructuring defaults only fire on `undefined` and never on
+  `null`. Use `result.continueUrl ?? fallback`.
+
+  Reading with truthiness (`if (result.continueUrl)`) or `??` is correct and always was.
+
+  This is the shape `cordova-khipu` and `react-native-khipu` publish, and the one the
+  Android SDK's own serialiser produces. Choosing it here was about agreeing with them,
+  not about which encoding is nicer.
 
 - **Android now refuses a second, concurrent `startOperation` call instead of hanging
   forever**, rejecting it with `'OPERATION_IN_PROGRESS'`. **iOS and web do not currently
@@ -211,6 +219,13 @@ unless you send `locale` explicitly.
   the iOS change above, "unset" finally means the same thing on both — the key is
   absent, and `result.failureReason` is `undefined`. Expect to hit it, and read it with
   truthiness or `??`.
+
+- **Only if you installed `8.0.0` or `7.0.0`:** those two releases *omitted* the three
+  optional keys instead of sending `null`, on both platforms. They were published and
+  corrected the same week, and they are the only versions that ever behaved that way —
+  every other Khipu plugin sends the key. `8.1.0` and `7.1.0` restore the agreed shape.
+  If you wrote `'continueUrl' in result` or `=== undefined` against those two releases,
+  that is the code to revisit.
 
 ## API
 
@@ -269,16 +284,16 @@ with no code, and web rejects a bare `Error`. Do not write
 
 #### KhipuResult
 
-| Prop                | Type                                                    | Description                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`operationId`**   | <code>string</code>                                     | The operation id that was passed to `startOperation`.                                                                                                                                                                                                                                                                                                                                                              |
-| **`exitTitle`**     | <code>string</code>                                     | Title of the closing screen the SDK already showed the payer (success, failure, warning, or continue). Confirmed on iOS, Android and web: all three set it from the same title the SDK's own screen displayed. Reuse it if you render your own screen instead of the SDK's.                                                                                                                                        |
-| **`exitMessage`**   | <code>string</code>                                     | Body text of the closing screen the SDK already showed the payer, paired with `exitTitle`. Confirmed on iOS, Android and web. Reuse it if you render your own screen instead of the SDK's.                                                                                                                                                                                                                         |
-| **`exitUrl`**       | <code>string</code>                                     | URL associated with the exit screen. Can come back empty on real payments, so check it before using it. When there is none, both native platforms omit the key, so it reads as `undefined`. Until 8.0.0 iOS sent an explicit JSON `null` instead — see the breaking change in the README.                                                                                                                          |
-| **`result`**        | <code>'OK' \| 'ERROR' \| 'WARNING' \| 'CONTINUE'</code> | Outcome of the operation. A user who abandons the payment arrives here as `'ERROR'` with `failureReason: 'USER_CANCELED'` — not as a rejected promise.                                                                                                                                                                                                                                                             |
-| **`failureReason`** | <code>string</code>                                     | Machine-readable reason behind the current `result`, straight from the Khipu protocol. Treat it as an open-ended string, not a fixed list: the protocol adds values over time — `USER_DISCONNECTED` is a recent one — and a hardcoded list here would go stale silently. When there is none, both native platforms omit the key, so it reads as `undefined`. Until 8.0.0 iOS sent an explicit JSON `null` instead. |
-| **`continueUrl`**   | <code>string</code>                                     | URL to send the payer to so they can finish the operation. Present when, and only when, `result` is `'CONTINUE'` — confirmed on iOS, Android and web, where every other outcome branch leaves it `undefined`/`nil`. Undefined for every other `result` value. When there is none, both native platforms omit the key, so it reads as `undefined`. Until 8.0.0 iOS sent an explicit JSON `null` instead.            |
-| **`events`**        | <code>KhipuEvent[]</code>                               | Events recorded during the operation, in the order the SDK reported them.                                                                                                                                                                                                                                                                                                                                          |
+| Prop                | Type                                                    | Description                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`operationId`**   | <code>string</code>                                     | The operation id that was passed to `startOperation`.                                                                                                                                                                                                                                                                                                                                                  |
+| **`exitTitle`**     | <code>string</code>                                     | Title of the closing screen the SDK already showed the payer (success, failure, warning, or continue). Confirmed on iOS, Android and web: all three set it from the same title the SDK's own screen displayed. Reuse it if you render your own screen instead of the SDK's.                                                                                                                            |
+| **`exitMessage`**   | <code>string</code>                                     | Body text of the closing screen the SDK already showed the payer, paired with `exitTitle`. Confirmed on iOS, Android and web. Reuse it if you render your own screen instead of the SDK's.                                                                                                                                                                                                             |
+| **`exitUrl`**       | <code>string \| null</code>                             | URL associated with the exit screen. Can come back empty on real payments, so check it before using it. The key is always present. When there is no value it holds `null`, never `undefined` and never absent, so the shape of the result does not change with the outcome of the payment. Compare with truthiness or `??`, not with `=== undefined`.                                                  |
+| **`result`**        | <code>'OK' \| 'ERROR' \| 'WARNING' \| 'CONTINUE'</code> | Outcome of the operation. A user who abandons the payment arrives here as `'ERROR'` with `failureReason: 'USER_CANCELED'` — not as a rejected promise.                                                                                                                                                                                                                                                 |
+| **`failureReason`** | <code>string \| null</code>                             | Machine-readable reason behind the current `result`, straight from the Khipu protocol. Treat it as an open-ended string, not a fixed list: the protocol adds values over time — `USER_DISCONNECTED` is a recent one — and a hardcoded list here would go stale silently. The key is always present; when there is no value it holds `null`. Compare with truthiness or `??`, not with `=== undefined`. |
+| **`continueUrl`**   | <code>string \| null</code>                             | URL to send the payer to so they can finish the operation. Present when, and only when, `result` is `'CONTINUE'` — confirmed on iOS, Android and web, where every other outcome branch leaves it `undefined`/`nil`. Undefined for every other `result` value. The key is always present; when there is no value it holds `null`. Compare with truthiness or `??`, not with `=== undefined`.            |
+| **`events`**        | <code>KhipuEvent[]</code>                               | Events recorded during the operation, in the order the SDK reported them.                                                                                                                                                                                                                                                                                                                              |
 
 
 #### KhipuEvent

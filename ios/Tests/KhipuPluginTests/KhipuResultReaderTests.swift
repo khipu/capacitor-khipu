@@ -19,29 +19,38 @@ final class KhipuResultReaderTests: XCTestCase {
         "result": "OK", "events": []
         """
 
-    /// The regression this file exists for. `result.exitUrl as Any` on a nil optional
-    /// does not produce nil - it produces an `Any` wrapping an empty optional, so the
-    /// key was written and the bridge serialised it as JSON null. Android omits these
-    /// keys, and `KhipuResult` declares them `string | undefined`, which an explicit
-    /// null does not satisfy. Asserting the exact key set is what kills that mutant:
-    /// `XCTAssertNil(payload["exitUrl"])` would pass on the boxed-optional value.
-    func testOmitsTheThreeOptionalsWhenTheSdkLeavesThemNil() throws {
+    /// The key set never varies with the outcome of the payment: all eight keys are
+    /// always present, and the three optional ones carry `NSNull` when the SDK has no
+    /// value. `NSNull` rather than a Swift nil because a `[String: Any]` drops a key
+    /// assigned nil, and rather than `as Any` on the optional because that is an
+    /// accident of casting that happens to serialise the same - this is meant to be a
+    /// decision, and to read like one.
+    ///
+    /// Asserting the exact key set is what keeps this honest: a helper that silently
+    /// went back to skipping nils would still pass every value assertion below.
+    func testWritesTheThreeOptionalsAsNullWhenTheSdkLeavesThemNil() throws {
         let payload = KhipuResultReader.read(try decode("{\(required)}"))
 
         XCTAssertEqual(
             Set(payload.keys),
-            ["operationId", "exitTitle", "exitMessage", "result", "events"])
+            ["operationId", "exitTitle", "exitMessage", "result", "events",
+             "exitUrl", "continueUrl", "failureReason"])
+        XCTAssertTrue(payload["exitUrl"] is NSNull)
+        XCTAssertTrue(payload["continueUrl"] is NSNull)
+        XCTAssertTrue(payload["failureReason"] is NSNull)
     }
 
-    /// An explicit JSON null from the SDK has to be treated exactly like an absent key.
+    /// An absent key and an explicit JSON null arriving from the SDK are the same
+    /// thing, and both leave as a present `null`.
     func testTreatsAnExplicitNullTheSameAsAnAbsentKey() throws {
         let payload = KhipuResultReader.read(try decode("""
             {\(required), "exitUrl": null, "continueUrl": null, "failureReason": null}
             """))
 
-        XCTAssertEqual(
-            Set(payload.keys),
-            ["operationId", "exitTitle", "exitMessage", "result", "events"])
+        XCTAssertEqual(Set(payload.keys).count, 8)
+        XCTAssertTrue(payload["exitUrl"] is NSNull)
+        XCTAssertTrue(payload["continueUrl"] is NSNull)
+        XCTAssertTrue(payload["failureReason"] is NSNull)
     }
 
     func testWritesTheThreeOptionalsWhenTheSdkSuppliesThem() throws {

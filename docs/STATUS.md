@@ -438,12 +438,12 @@ are comparable to each other one for one. All measured 2026-09-12.
 | Cap 8 | Android | `2.28.5` | **6 keys, both absent** |
 | Cap 7 | Android | `2.28.5` | **6 keys, both absent** |
 
-The last four rows are what this major is for (`8.0.0` on the 8.x line,
-`7.0.0` on the 7.x line): iOS now returns the same six keys Android
-returns, measured on a device rather than argued from source. The raw dump confirms the
-keys are gone, not nulled — `{"exitUrl":"https://…","events":[…],"operationId":…}` with
-no `continueUrl` or `failureReason` entry. The two lines agree with each other on each
-platform, and now the platforms agree with each other.
+The last four rows measured `8.0.0`/`7.0.0`, which omitted the two empty keys — that is
+why they show six. **`8.1.0`/`7.1.0` send all eight**, the three optional ones holding
+`null` (see "The encoding of an empty result field"). The rows are kept because what they
+establish is still true and still the point: the two platforms agree with each other, and
+both lines agree, measured on device rather than argued from source. Only the encoding of
+the empty ones changed afterwards, and it changed on both at once.
 
 **What these runs establish, and what they are not for.** The verdict is the SDK's own
 result, read from the driver log: all eight resolved `result: "OK"` with the exit screen
@@ -492,6 +492,58 @@ over a wide sample before reading meaning into one.
 None of this touches the key measurement, which comes from the `KhipuResult` the bridge
 handed back and not from reconciliation. Separately, **the web layer has never been
 exercised by a real payment**, and it is the most-changed code in this pass.
+
+## The encoding of an empty result field
+
+**Settled 2026-09-15: the key is always present and carries `null`.** This applies to the
+three fields the Android SDK declares `@Nullable` — `exitUrl`, `continueUrl`,
+`failureReason` — and to no others. Published type: `string | null`.
+
+This took two attempts in one week and the record of why is worth more than the outcome.
+
+`8.0.0` went the other way, aligning both platforms on *omitting* the key. The argument
+was that `KhipuResult` declared `string | undefined`, which `null` does not satisfy, so
+iOS was contradicting the published type. **That argument was weaker than it was
+presented.** `tsc --strict` flags neither `=== null` against `string | undefined` nor
+`=== undefined` against `string | null` — verified in both directions with a positive
+control that does fail. The declaration only bites on assignment, so changing the `.d.ts`
+was as available as changing the bridge, and treating the type as ground truth begged the
+question it was supposed to answer. Credit for the objection goes to the `cordova-khipu`
+session, which reproduced the experiment symmetrically.
+
+What actually decides it is that this plugin is one of four, and the other three had
+already converged:
+
+| plugin | encoding | how it got there |
+| --- | --- | --- |
+| `cordova-khipu` | present as `null`, both platforms | deliberate, shipped `2.11.0` |
+| `react-native-khipu` | present as `null`, both platforms | deliberate, type widened to `string \| null` |
+| `flutter-khipu` | split, but invisible in Dart | no stake; `map['k']` is `null` either way |
+| `capacitor-khipu` | was the only one omitting | corrected here |
+
+And upstream agrees: `KhipuResult.asJson()` builds its `Gson` with `serializeNulls`,
+verified in the `2.28.4` and `2.28.5` bytecode. The SDK's own serialisation emits the
+three keys holding `null`.
+
+**What is *not* in dispute, and never was:** which fields are optional. `javap` on the
+AAR puts `@Nullable` on exactly `getExitUrl`, `getContinueUrl` and `getFailureReason`,
+and `@NotNull` on the other five. Every bridge applies its optional handling to those
+three and only those three. There were never two contracts — one contract, two encodings
+of emptiness. That framing came from the `flutter-khipu` session and is the clearest way
+to hold the problem.
+
+**Version.** Shipped as `8.1.0` / `7.1.0`, a minor, with `8.0.0` and `7.0.0` deprecated
+on npm pointing at them. Strictly this is a breaking change and wants a major, but the
+versioning scheme adopted the same morning — plugin major equals Capacitor major — leaves
+no free major inside a line, and the two releases being corrected were hours old with
+effectively no adoption. `npm deprecate` is the tool built for exactly that population.
+`cordova-khipu` shipped the equivalent change as a documented minor too.
+
+**The scheme's ceiling is real and unresolved.** Tying the major to Capacitor's was
+recommended here as removing it "for good"; it relocated it. The next breaking change
+inside a maintained line will face the same wall. Options when that happens: wide bands
+(`70.x` for Capacitor 7, `80.x` for Capacitor 8), or accept documented minors as the
+convention. Decide it before it is urgent.
 
 ## Cross-SDK finding to report upstream
 
@@ -606,13 +658,11 @@ it.
     | `continueUrl` | `null` |
     | `events` | empty |
 
-    **This interacts with the boundary decision above.** `failureReason` arrives as an
-    explicit `null` at the SDK layer, not absent and not `"USER_CANCELED"`. Both our
-    readers omit null keys as of 8.0.0 — see "Decide the canonical shape of an absent
-    result field" — so the merchant sees the key absent rather than `null`, and sees it
-    that way on either platform. That remains our deliberate choice, but it now reduces
-    an explicit `null` rather than standing in for a wrong label. A genuine cancellation
-    still reports `failureReason: "USER_CANCELED"`.
+    **This interacts with the result encoding.** `failureReason` arrives as an explicit
+    `null` at the SDK layer, not absent and not `"USER_CANCELED"`. As of `8.1.0` both
+    readers pass that through as a present `null` (see "The encoding of an empty result
+    field"), so the merchant sees exactly what the SDK saw, on either platform. A
+    genuine cancellation still reports `failureReason: "USER_CANCELED"`.
   - _The deserialisation itself_ is not hardened. Verified against protocol `1.0.60`:
     `forValue` declares `throws IOException`, there is `@JsonValue` and `@JsonCreator`
     but no `@JsonEnumDefaultValue`, the converter configures only
