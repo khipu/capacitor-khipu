@@ -545,6 +545,24 @@ inside a maintained line will face the same wall. Options when that happens: wid
 (`70.x` for Capacitor 7, `80.x` for Capacitor 8), or accept documented minors as the
 convention. Decide it before it is urgent.
 
+**How to hand a result-shape change to the docs session.** Twice in one week the code
+and the README were right and the *summary* sent to `khipudocs` was wrong. The first
+said "breaking, iOS only", which described the diff of `8.0.0` rather than the merchant's
+position; the second described the new state without saying where it is reached from. A
+reader building a migration guide from either would have told Android merchants they had
+nothing to check, when Android is the only side that changed.
+
+So state it as a delta, per platform, against the last stable release — not as a
+description of the new behaviour:
+
+| platform | on `4.x` | on `8.1.0` | changes? |
+| --- | --- | --- | --- |
+| iOS | `null` | `null` | no |
+| Android | key absent | `null` | **yes** |
+
+A well-written README does not protect against this, because whoever writes the other
+side's documentation works from the summary.
+
 ## Cross-SDK finding to report upstream
 
 **The two native SDKs disagree on the `locale` default.** When the merchant does not
