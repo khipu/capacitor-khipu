@@ -246,11 +246,11 @@ export interface KhipuResult {
    * URL associated with the exit screen. Can come back empty on real payments, so
    * check it before using it.
    *
-   * When there is none, both native platforms omit the key, so it reads as
-   * `undefined`. Until 8.0.0 iOS sent an explicit JSON `null` instead — see the
-   * breaking change in the README.
+   * The key is always present. When there is no value it holds `null`, never
+   * `undefined` and never absent, so the shape of the result does not change with the
+   * outcome of the payment. Compare with truthiness or `??`, not with `=== undefined`.
    */
-  exitUrl: string | undefined;
+  exitUrl: string | null;
   // Never add 'CANCELED' (or any other value) to this union without a major version
   // bump. Merchants switch on `result` exhaustively, so a new member breaks their
   // compile the moment they upgrade even a minor release. A user who cancels is
@@ -266,20 +266,20 @@ export interface KhipuResult {
    * values over time — `USER_DISCONNECTED` is a recent one — and a hardcoded list
    * here would go stale silently.
    *
-   * When there is none, both native platforms omit the key, so it reads as
-   * `undefined`. Until 8.0.0 iOS sent an explicit JSON `null` instead.
+   * The key is always present; when there is no value it holds `null`. Compare with
+   * truthiness or `??`, not with `=== undefined`.
    */
-  failureReason: string | undefined;
+  failureReason: string | null;
   /**
    * URL to send the payer to so they can finish the operation. Present when, and
    * only when, `result` is `'CONTINUE'` — confirmed on iOS, Android and web, where
    * every other outcome branch leaves it `undefined`/`nil`. Undefined for every
    * other `result` value.
    *
-   * When there is none, both native platforms omit the key, so it reads as
-   * `undefined`. Until 8.0.0 iOS sent an explicit JSON `null` instead.
+   * The key is always present; when there is no value it holds `null`. Compare with
+   * truthiness or `??`, not with `=== undefined`.
    */
-  continueUrl: string | undefined;
+  continueUrl: string | null;
   /**
    * Events recorded during the operation, in the order the SDK reported them.
    */

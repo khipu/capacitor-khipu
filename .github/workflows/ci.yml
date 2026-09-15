@@ -71,7 +71,12 @@ jobs:
       # defense against a tampered wrapper.
       - name: Validate the Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          # Default is 'tools platform-tools'. The obsolete `tools` package was
+          # removed from the SDK repository, so sdkmanager exits 1 trying to find
+          # it and the job dies before Gradle runs. Nothing here needs it.
+          packages: platform-tools
       - uses: actions/setup-node@v4
         with:
           node-version: 22
