@@ -45,10 +45,10 @@ public class KhipuResultReaderTest {
     }
 
     @Test
-    public void omitsTheKeysThatHaveNoValue() {
-        // A dedicated fixture, not canceled(): canceled() now carries every field so
-        // readsEveryContractField can assert all eight, so the omission case needs its
-        // own KhipuResult with exitUrl and continueUrl genuinely absent.
+    public void writesTheKeysThatHaveNoValueAsAnExplicitNull() {
+        // A dedicated fixture, not canceled(): canceled() carries every field so
+        // readsEveryContractField can assert all eight, so this case needs its own
+        // KhipuResult with exitUrl and continueUrl genuinely absent.
         KhipuResult withoutOptionalFields = new KhipuResult(
             "op-1",
             "Payment canceled",
@@ -62,12 +62,27 @@ public class KhipuResultReaderTest {
 
         JSObject result = KhipuResultReader.read(withoutOptionalFields);
 
-        assertFalse(result.has("exitUrl"));
-        assertFalse(result.has("continueUrl"));
+        // has() and isNull() together, not either alone: has() passes on a key holding
+        // any value, and isNull() passes on a key that is not there at all. Only the
+        // pair says "present, and null".
+        assertTrue(result.has("exitUrl"));
+        assertTrue(result.isNull("exitUrl"));
+        assertTrue(result.has("continueUrl"));
+        assertTrue(result.isNull("continueUrl"));
     }
 
     @Test
-    public void omitsFailureReasonWhenTheSdkCouldNotDetermineOne() {
+    public void keepsTheKeySetIndependentOfTheOutcome() {
+        // The point of the whole encoding: a merchant logging or diffing results gets
+        // the same shape whatever happened to the payment.
+        KhipuResult withoutOptionalFields = new KhipuResult("op-1", "", "", null, null, "ERROR", new KhipuEvent[0], null);
+
+        assertEquals(KhipuResultReader.read(canceled()).length(), KhipuResultReader.read(withoutOptionalFields).length());
+        assertEquals(8, KhipuResultReader.read(withoutOptionalFields).length());
+    }
+
+    @Test
+    public void writesFailureReasonAsNullWhenTheSdkCouldNotDetermineOne() {
         // Not hypothetical. Under IKW-1232 the SDK ends the operation when a terminal
         // message fails to deserialise, and the reason is exactly the part that failed
         // to parse, so it arrives null.
@@ -76,7 +91,8 @@ public class KhipuResultReaderTest {
         JSObject result = KhipuResultReader.read(withoutReason);
 
         assertEquals("ERROR", result.getString("result"));
-        assertFalse(result.has("failureReason"));
+        assertTrue(result.has("failureReason"));
+        assertTrue(result.isNull("failureReason"));
     }
 
     @Test

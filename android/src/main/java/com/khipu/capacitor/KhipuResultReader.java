@@ -5,6 +5,7 @@ import com.getcapacitor.JSObject;
 import com.khipu.client.KhipuEvent;
 import com.khipu.client.KhipuResult;
 import java.io.Serializable;
+import org.json.JSONObject;
 
 /**
  * Turns the activity's payload into the object handed back to JS, or null when there is
@@ -17,9 +18,10 @@ import java.io.Serializable;
  * would make the same outcome, the user abandoning the payment, arrive in two different
  * shapes depending on an invisible timing detail.
  *
- * The object is built key by key rather than through KhipuResult.asJson(), which is
- * Gson with nulls dropped: it silently omits exitUrl, continueUrl and failureReason,
- * and it puts the field names out of reach of the vocabulary guard.
+ * The object is built key by key rather than through KhipuResult.asJson(): that helper
+ * puts the field names out of reach of the vocabulary guard. (It is otherwise a fine
+ * encoding — since 2.28.4 it builds its Gson with serializeNulls, so it emits the same
+ * present-as-null shape this reader now produces.)
  */
 final class KhipuResultReader {
 
@@ -46,18 +48,18 @@ final class KhipuResultReader {
     /**
      * Every key goes through here, in one call shape, for two reasons.
      *
-     * A null value is skipped rather than written: an absent key reads as `undefined`
-     * in JS, which is what `string | undefined` promises, while an explicit null would
-     * not satisfy that type. `events` is never null, so it is always written.
+     * A null value is written as JSONObject.NULL, not skipped, so the key set never
+     * varies with the outcome of the payment: all eight are always present and the
+     * three optional ones carry an explicit null. JSONObject.NULL rather than a bare
+     * null because JSONObject.put REMOVES the key when handed one — that is exactly how
+     * this side came to omit them in the first place, and it is silent.
      *
      * And one uniform shape is what `check-option-keys.mjs` greps for. A second
      * spelling would hide those keys from the guard — which is exactly how the old
      * `asJson()` call kept the whole result out of its reach.
      */
     private static void put(JSObject target, String key, Object value) {
-        if (value != null) {
-            target.put(key, value);
-        }
+        target.put(key, value == null ? JSONObject.NULL : value);
     }
 
     private static JSArray events(KhipuEvent[] events) {
