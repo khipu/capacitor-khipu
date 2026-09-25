@@ -1,0 +1,91 @@
+# Dependabot keeps the tooling current. What a merchant compiles moves by hand: the
+# native Khipu SDKs in Package.swift, CapacitorKhipu.podspec and android/build.gradle
+# are not listed here on purpose. KhipuClientIOS lives in two files that
+# scripts/check-native-versions.mjs holds in sync, a bump to one of them alone would
+# fail that guard, and every SDK version is checked on devices before it ships
+# (docs/STATUS.md).
+#
+# Version updates only bump direct dependencies. The vulnerable transitive packages
+# behind most alerts are fixed by security updates, a repository setting rather than
+# this file; the `security` groups below only batch those pull requests into one.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Santiago
+    # A release that is days old is where a hijacked package does its damage.
+    # Security updates are exempt, so a fix still arrives as soon as it exists.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      # A Capacitor major is a new plugin line with its own branch (docs/STATUS.md),
+      # not a dependency bump. `ignore` applies to security updates too.
+      - dependency-name: "@capacitor/core"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@capacitor/android"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@capacitor/ios"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@capacitor/cli"
+        update-types: ["version-update:semver-major"]
+    groups:
+      # @ionic/eslint-config 0.5.0 requires eslint 10: a 0.x minor that is really a
+      # major. Inside `tooling` it would clash with eslint 8 and stall every other
+      # bump, so the two move together as one migration pull request.
+      eslint:
+        patterns: ["eslint", "@ionic/eslint-config"]
+      # Majors stay out of the group: each one gets its own pull request, since those
+      # are the ones that need reading (release-it 17 -> 21 needed commitlint too).
+      tooling:
+        patterns: ["*"]
+        exclude-patterns: ["eslint", "@ionic/eslint-config"]
+        update-types: [minor, patch]
+      security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  # The example app is not published, but it is what device runs are built from.
+  - package-ecosystem: npm
+    directory: /example
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Santiago
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      # Every @capacitor/* package the example uses tracks the Capacitor major.
+      - dependency-name: "@capacitor/*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      example:
+        patterns: ["*"]
+        update-types: [minor, patch]
+      security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      time: "09:00"
+      timezone: America/Santiago
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
