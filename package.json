@@ -40,7 +40,7 @@
     "verify:web": "npm run build",
     "lint": "npm run eslint && npm run prettier -- --check && npm run swiftlint -- lint",
     "fmt": "npm run eslint -- --fix && npm run prettier -- --write && npm run swiftlint -- --fix --format",
-    "eslint": "eslint . --ext ts,js,mjs,mts --max-warnings 0",
+    "eslint": "eslint . --max-warnings 0",
     "prettier": "prettier \"**/*.{css,html,ts,js,java}\" --plugin=prettier-plugin-java",
     "swiftlint": "node-swiftlint",
     "docgen": "docgen --api KhipuPlugin --output-readme README.md --output-json dist/docs.json",
@@ -58,12 +58,13 @@
     "@capacitor/ios": "^8.5.1",
     "@commitlint/config-conventional": "^21.2.3",
     "@evilmartians/lefthook": "^2.1.14",
-    "@ionic/eslint-config": "^0.4.0",
+    "@ionic/eslint-config": "^0.5.0",
     "@ionic/prettier-config": "^4.0.0",
     "@ionic/swiftlint-config": "^2.0.0",
     "@release-it/conventional-changelog": "^12.0.2",
     "commitlint": "^21.2.3",
-    "eslint": "^8.57.1",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
     "jsdom": "^30.0.1",
     "prettier": "^3.9.6",
     "prettier-plugin-java": "^2.10.3",
@@ -82,32 +83,6 @@
   },
   "prettier": "@ionic/prettier-config",
   "swiftlint": "@ionic/swiftlint-config",
-  "eslintConfig": {
-    "root": true,
-    "extends": "@ionic/eslint-config/recommended",
-    "overrides": [
-      {
-        "files": [
-          "example/**/*.js"
-        ],
-        "rules": {
-          "@typescript-eslint/explicit-module-boundary-types": "off"
-        },
-        "env": {
-          "browser": true
-        }
-      },
-      {
-        "files": [
-          "scripts/**",
-          "*.mjs"
-        ],
-        "env": {
-          "node": true
-        }
-      }
-    ]
-  },
   "capacitor": {
     "ios": {
       "src": "ios"
