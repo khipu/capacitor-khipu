@@ -57,7 +57,7 @@
     "@capacitor/docgen": "^0.3.1",
     "@capacitor/ios": "^8.5.1",
     "@commitlint/config-conventional": "^21.2.3",
-    "@evilmartians/lefthook": "^1.6.14",
+    "@evilmartians/lefthook": "^2.1.14",
     "@ionic/eslint-config": "^0.4.0",
     "@ionic/prettier-config": "^4.0.0",
     "@ionic/swiftlint-config": "^2.0.0",
