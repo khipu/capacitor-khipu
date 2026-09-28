@@ -105,19 +105,50 @@ updates:
       # The Android SDK, see the top of this file.
       - dependency-name: "com.khipu:*"
       # AGP, Gradle and google-services come from the Android template of the Capacitor
-      # major a line supports: AGP 8.13.0, Gradle 8.14 and google-services 4.4.4 for
-      # Capacitor 8, while Capacitor 9 ships AGP 9 and Gradle 9. The plugin's buildscript
-      # runs inside the merchant's build, so its AGP stays on Capacitor's, and the next
-      # majors arrive with the next plugin line. The example never applies
-      # google-services (there is no google-services.json), so it just follows the
-      # template.
+      # major a line supports: AGP 8.13.0, Gradle 8.14 and google-services 4.4.4 on
+      # Capacitor 8, AGP 8.7.2, Gradle 8.11 and google-services 4.4.2 on Capacitor 7.
+      # The plugin's buildscript runs inside the merchant's build, so its AGP stays on
+      # Capacitor's. Gradle takes patches only: a minor would take 7.x off its template,
+      # and Capacitor 9 ships Gradle 9 and AGP 9 with the next plugin line. The example
+      # never applies google-services (there is no google-services.json), so it just
+      # follows the template.
       - dependency-name: "com.android.tools.build:gradle"
       - dependency-name: "com.google.gms:google-services"
       - dependency-name: "gradle-wrapper"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
       # org.json versions are dates, so every one of its bumps is a major and gets its
       # own pull request.
+      android:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # The same for the 7.x line. Dependabot reads this file only from the default branch,
+  # so another line gets its updates through `target-branch`, not through a
+  # dependabot.yml of its own. Keep both gradle entries identical apart from that key.
+  - package-ecosystem: gradle
+    target-branch: "7.x"
+    directories:
+      - /android
+      - /example/android
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Santiago
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      # Same list, for the same reasons, as the entry above.
+      - dependency-name: "com.khipu:*"
+      - dependency-name: "com.android.tools.build:gradle"
+      - dependency-name: "com.google.gms:google-services"
+      - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    groups:
       android:
         patterns: ["*"]
         update-types: [minor, patch]
