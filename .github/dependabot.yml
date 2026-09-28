@@ -123,9 +123,82 @@ updates:
         patterns: ["*"]
         update-types: [minor, patch]
 
-  # The same for the 7.x line. Dependabot reads this file only from the default branch,
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      time: "09:00"
+      timezone: America/Santiago
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The 7.x line (Capacitor 7). Dependabot reads this file only from the default branch,
   # so another line gets its updates through `target-branch`, not through a
-  # dependabot.yml of its own. Keep both gradle entries identical apart from that key.
+  # dependabot.yml of its own. Each entry below repeats the main entry for the same
+  # ecosystem and directory, and is identical to it apart from `target-branch` and the
+  # `security` groups: security updates only cover the default branch, so on 7.x a
+  # vulnerable transitive package moves only when a version update moves it. Branch
+  # names include the target branch, so the two sets of entries do not collide.
+  - package-ecosystem: npm
+    target-branch: "7.x"
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Santiago
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      # Same reasons as the main entry. On this line the @capacitor majors ignore is
+      # what keeps Capacitor 8, which is main's line, out of 7.x.
+      - dependency-name: "@capacitor/core"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@capacitor/android"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@capacitor/ios"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@capacitor/cli"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        versions: [">=7.0.0"]
+    groups:
+      eslint:
+        patterns: ["eslint", "@ionic/eslint-config"]
+      tooling:
+        patterns: ["*"]
+        exclude-patterns: ["eslint", "@ionic/eslint-config"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    target-branch: "7.x"
+    directory: /example
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Santiago
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      - dependency-name: "@capacitor/*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      example:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
   - package-ecosystem: gradle
     target-branch: "7.x"
     directories:
@@ -142,7 +215,6 @@ updates:
       prefix: chore
       include: scope
     ignore:
-      # Same list, for the same reasons, as the entry above.
       - dependency-name: "com.khipu:*"
       - dependency-name: "com.android.tools.build:gradle"
       - dependency-name: "com.google.gms:google-services"
@@ -154,6 +226,7 @@ updates:
         update-types: [minor, patch]
 
   - package-ecosystem: github-actions
+    target-branch: "7.x"
     directory: /
     schedule:
       interval: monthly
