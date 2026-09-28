@@ -67,6 +67,41 @@ alongside the keys Capacitor already put there:
 </plist>
 ```
 
+### Xcode 27
+
+Xcode 27 refuses to build any iOS target whose deployment target is below 15.0, and a
+Capacitor 7 app is created with 14.0. On Xcode 27 the build stops before compiling
+anything, with one error per target:
+
+```text
+The iOS deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 14.0, but the range of supported deployment target versions is 15.0 to 27.0.x.
+```
+
+This comes from Capacitor 7's defaults, not from this plugin: Capacitor's own targets
+fail the same way. Xcode 26 and earlier are not affected. To build with Xcode 27, raise
+the deployment target to 15.0, which means your app no longer installs on iOS 14:
+
+1. In Xcode, select the **App** target and set **Minimum Deployments** to 15.0. With
+   Swift Package Manager, this is all you need.
+2. With CocoaPods, also set `platform :ios, '15.0'` in `ios/App/Podfile`, and raise the
+   pods in its `post_install`. Capacitor's own `assertDeploymentTarget` only raises them
+   to 14.0, so keep it and add the loop after it:
+
+   ```ruby
+   post_install do |installer|
+     assertDeploymentTarget(installer)
+     installer.pods_project.targets.each do |target|
+       target.build_configurations.each do |config|
+         if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 15.0
+           config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+         end
+       end
+     end
+   end
+   ```
+
+   Then run `npx cap sync ios`, which runs `pod install` again.
+
 ## Android setup
 
 ### Main Khipu repository
