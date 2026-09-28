@@ -1,6 +1,0 @@
-build
-dist
-
-# Web bundles that Capacitor copies to the native platforms on every `cap sync`.
-example/ios/App/App/public
-example/android/app/src/main/assets/public
