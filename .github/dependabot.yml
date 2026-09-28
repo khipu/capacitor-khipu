@@ -1,6 +1,7 @@
 # Dependabot keeps the tooling current. What a merchant compiles moves by hand: the
-# native Khipu SDKs in Package.swift, CapacitorKhipu.podspec and android/build.gradle
-# are not listed here on purpose. KhipuClientIOS lives in two files that
+# native Khipu SDKs are left out on purpose. Package.swift and CapacitorKhipu.podspec
+# have no entry here, and the gradle entry below ignores `com.khipu:*` in
+# android/build.gradle. KhipuClientIOS lives in two files that
 # scripts/check-native-versions.mjs holds in sync, a bump to one of them alone would
 # fail that guard, and every SDK version is checked on devices before it ships
 # (docs/STATUS.md).
@@ -80,6 +81,46 @@ updates:
       security:
         applies-to: security-updates
         patterns: ["*"]
+
+  # What is left for Dependabot on Android: the test dependencies in android/build.gradle
+  # and the Gradle wrapper of both projects. It reads build files as text, so a version
+  # that comes from a variable is invisible to it: the `project.hasProperty(...) ?`
+  # fallbacks, and example/android/variables.gradle. Projects that live in node_modules
+  # are skipped. One entry for both directories, so a wrapper bump moves them together.
+  - package-ecosystem: gradle
+    directories:
+      - /android
+      - /example/android
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Santiago
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      # The Android SDK, see the top of this file.
+      - dependency-name: "com.khipu:*"
+      # AGP, Gradle and google-services come from the Android template of the Capacitor
+      # major a line supports: AGP 8.13.0, Gradle 8.14 and google-services 4.4.4 for
+      # Capacitor 8, while Capacitor 9 ships AGP 9 and Gradle 9. The plugin's buildscript
+      # runs inside the merchant's build, so its AGP stays on Capacitor's, and the next
+      # majors arrive with the next plugin line. The example never applies
+      # google-services (there is no google-services.json), so it just follows the
+      # template.
+      - dependency-name: "com.android.tools.build:gradle"
+      - dependency-name: "com.google.gms:google-services"
+      - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major"]
+    groups:
+      # org.json versions are dates, so every one of its bumps is a major and gets its
+      # own pull request.
+      android:
+        patterns: ["*"]
+        update-types: [minor, patch]
 
   - package-ecosystem: github-actions
     directory: /
