@@ -22,6 +22,12 @@ extra steps on your side: the Capacitor CLI picks the `Package.swift` or the
 `CapacitorKhipu.podspec` depending on which manager your app uses. The two managers
 cannot coexist in the same iOS project.
 
+**The CocoaPods trunk becomes read-only on December 2, 2026**, as
+[announced by CocoaPods](https://blog.cocoapods.org/CocoaPods-Specs-Repo/). iOS SDK
+versions released after that date will only be available through Swift Package
+Manager, so an app that installs through CocoaPods will stay on the last SDK version
+published to the trunk.
+
 ## Install
 
 ```bash
