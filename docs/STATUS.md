@@ -1,8 +1,7 @@
 # Status
 
-**Last updated:** 2026-10-01 — `8.1.1` and `7.1.1` published, both on Android SDK
-`2.28.6` and iOS SDK `2.17.1`. Both lines have since moved to Android SDK `2.28.7`
-(IKW-1266), not yet published. The device check of a real QR authorisation is still
+**Last updated:** 2026-10-01 — `8.1.2` and `7.1.2` published, both on Android SDK
+`2.28.7` and iOS SDK `2.17.1`. The device check of a real QR authorisation is still
 pending; see "Known pending".
 
 This is the entry point for picking up plugin work without prior context. The design
@@ -225,8 +224,8 @@ single Capacitor 5 target into three lines: two maintained, one frozen.
 
 | Line | Branch        | Capacitor | iOS min | dist-tag | Version  |
 | ---- | ------------- | --------- | ------- | -------- | -------- |
-| 8.x  | `main`        | 8         | 15      | `latest` | `8.1.1`  |
-| 7.x  | `7.x`         | 7         | 14      | `cap7`   | `7.1.1`  |
+| 8.x  | `main`        | 8         | 15      | `latest` | `8.1.2`  |
+| 7.x  | `7.x`         | 7         | 14      | `cap7`   | `7.1.2`  |
 | 2.x  | `release/2.x` | 5 and 6   | 13      | `cap6`   | `2.11.3` |
 
 **Both maintained lines expose `Package.swift` and `CapacitorKhipu.podspec`**, so a
@@ -241,7 +240,7 @@ paths against real builds.
 All three lines are published to npm, as of 2026-10-01, with these dist-tags:
 
 ```
-{ latest: '8.1.1', cap6: '2.11.3', cap7: '7.1.1' }
+{ latest: '8.1.2', cap6: '2.11.3', cap7: '7.1.2' }
 ```
 
 **A version can take a couple of minutes to appear after `npm publish`.** release-it 21
@@ -647,8 +646,8 @@ it.
 
 ## Known pending
 
-- **`khipu-client-android 2.28.7` ships the SDK's R8 consumer rules (IKW-1266). Both
-  lines are on it; neither is published.** `2.28.6` and earlier published an empty
+- **`khipu-client-android 2.28.7` ships the SDK's R8 consumer rules (IKW-1266).
+  Published in `8.1.2` and `7.1.2` on 2026-10-01.** `2.28.6` and earlier published an empty
   `proguard.txt` in the AAR, so under R8 the SDK's public API and protocol classes were
   stripped or renamed unless the merchant copied the rules from docs.khipu.com by hand,
   and the payment ended in `ERROR` as soon as it started. `2.28.7` ships four rules that
@@ -661,8 +660,10 @@ it.
     keep only public and protected members and the Kotlin backing fields are private.
     `KhipuResultReader` calls `asJson()` nowhere: it builds the result from string
     literals and public getters, which R8 leaves alone.
-  - **The README says nothing about R8.** Whether to tell merchants that R8 needs `8.1.2`
-    or `7.1.2` onwards, or the docs rules before that, is not decided.
+  - **The README has an "R8" section** in "Android setup": from `8.1.2` (`7.1.2` on
+    Capacitor 7) the merchant needs no rules of their own, and it lists the four rules
+    for whoever cannot upgrade yet. The GitHub releases of both versions carry the same
+    note.
 
 - **`khipu-client-android 2.28.6` replaces ML Kit with ZXing (IKW-1264). Published in
   `8.1.1` and `7.1.1` on 2026-10-01, before the device check this entry had set as the
