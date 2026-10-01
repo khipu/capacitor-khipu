@@ -167,6 +167,29 @@ or because your app already uses Kotlin. `khipu-client-android` is compiled with
 2.0.21: a 1.9 compiler cannot read 2.0 metadata, and under JDK 21 Kotlin 1.9.0 does not
 even configure, failing with `Unknown Kotlin JVM target: 21`.
 
+### R8
+
+**From `7.1.2`, you need no ProGuard or R8 rules of your own for Khipu.** The Android SDK
+ships its consumer rules, and R8 applies them when your release build has
+`minifyEnabled true`. Capacitor's app template ships with `minifyEnabled false`, so this
+only concerns you if you turned it on.
+
+**On earlier versions, a release built with R8 fails every payment.** The SDK shipped no
+rules, R8 strips or renames its classes, and `startOperation` resolves with
+`result: 'ERROR'` and no events as soon as the payment starts. Upgrade, or add the rules
+the SDK now ships to `android/app/proguard-rules.pro`:
+
+```
+-keep public class com.khipu.client.**{ public protected *; }
+-keep class com.khipu.khenshin.protocol.** { *; }
+-keepclassmembers class com.khipu.client.KhipuResult { <fields>; }
+-keepclassmembers class com.khipu.client.KhipuEvent { <fields>; }
+```
+
+Verified on a Capacitor 7 app built from scratch, paying through DemoBank with R8 on
+and no rules of the app's own: `7.1.1` ends in `ERROR` with no events, and the code
+that ships as `7.1.2` completes the payment with all eight result keys.
+
 ## Usage
 
 The plugin exports a single object, `Khipu`. The only thing you have to pass is the
