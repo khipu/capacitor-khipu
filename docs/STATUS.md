@@ -1,7 +1,8 @@
 # Status
 
 **Last updated:** 2026-10-01 — `8.1.1` and `7.1.1` published, both on Android SDK
-`2.28.6` and iOS SDK `2.17.1`. The device check of a real QR authorisation is still
+`2.28.6` and iOS SDK `2.17.1`. Both lines have since moved to Android SDK `2.28.7`
+(IKW-1266), not yet published. The device check of a real QR authorisation is still
 pending; see "Known pending".
 
 This is the entry point for picking up plugin work without prior context. The design
@@ -432,8 +433,10 @@ plugin being wired in and callable was exercised.
 
 Real payments driven through the from-scratch doctest apps, against a production
 developer account whose only bank is DemoBank. Every row below is a payment the SDK
-carried to `result: "OK"` with the exit screen "¡Listo, transferiste!", so the key sets
-are comparable to each other one for one. All measured 2026-09-12.
+carried to `result: "OK"` with the exit screen "¡Listo, transferiste!" (rendered as
+"Ready, you have transferred!" on an English-language emulator), so the key sets are
+comparable to each other one for one. The first eight rows were measured 2026-09-12, the
+last four 2026-10-01.
 
 | line | platform | SDK | `Object.keys(result)` |
 | --- | --- | --- | --- |
@@ -445,16 +448,33 @@ are comparable to each other one for one. All measured 2026-09-12.
 | Cap 7 | iOS | `2.17.1`, post-fix | **6 keys, both absent** |
 | Cap 8 | Android | `2.28.5` | **6 keys, both absent** |
 | Cap 7 | Android | `2.28.5` | **6 keys, both absent** |
+| Cap 8 | Android | `2.28.6`, `8.1.1` from npm, debug | 8 keys |
+| Cap 7 | Android | `2.28.6`, `7.1.1` from npm, debug | 8 keys |
+| Cap 8 | Android | `2.28.7`, local pack, release with R8 | 8 keys, `continueUrl`/`failureReason` present as `null` |
+| Cap 7 | Android | `2.28.7`, local pack, release with R8 | 8 keys, both present as `null` |
 
-The last four rows measured `8.0.0`/`7.0.0`, which omitted the two empty keys — that is
-why they show six. **`8.1.0`/`7.1.0` send all eight**, the three optional ones holding
+The four six-key rows measured `8.0.0`/`7.0.0`, which omitted the two empty keys — that
+is why they show six. **`8.1.0`/`7.1.0` send all eight**, the three optional ones holding
 `null` (see "The encoding of an empty result field"). The rows are kept because what they
 establish is still true and still the point: the two platforms agree with each other, and
 both lines agree, measured on device rather than argued from source. Only the encoding of
 the empty ones changed afterwards, and it changed on both at once.
 
+**The two R8 rows have a negative control, and it matters more than they do.** Each
+doctest app was built as a release with `minifyEnabled true`, signed with the debug key,
+and with no rules of its own in `proguard-rules.pro`. The same build of the published
+`8.1.1` and `7.1.1`, on `2.28.6`, ends at once in `result: "ERROR"` with zero events and
+no crash, before the bank picker appears, on both lines. That is IKW-1266 as a merchant
+who turned on R8 meets it, and it shows the test tells a fixed build from a broken one
+instead of passing either way. The Capacitor templates for 7 and 8 ship
+`minifyEnabled false`, so a merchant who never touched it is not affected. Two harness
+details to keep: Capacitor writes `console.log` to logcat only in debug builds unless
+`loggingBehavior: 'production'` is set, and a `uiautomator dump` that fails leaves the
+previous `/sdcard/ui.xml` in place, so delete it before each dump or the driver reads a
+stale screen.
+
 **What these runs establish, and what they are not for.** The verdict is the SDK's own
-result, read from the driver log: all eight resolved `result: "OK"` with the exit screen
+result, read from the driver log: every row resolved `result: "OK"` with the exit screen
 the payer saw. That is what these runs measure — the bridge launches the SDK, the flow
 reaches its end, and the result comes back into the host language with the right shape.
 **Server-side reconciliation is not our gate** (decided 2026-09-12): the backend owns it,
@@ -593,6 +613,23 @@ looked the same and the difference would have stayed hidden until a merchant rep
 it.
 
 ## Known pending
+
+- **`khipu-client-android 2.28.7` ships the SDK's R8 consumer rules (IKW-1266). Both
+  lines are on it; neither is published.** `2.28.6` and earlier published an empty
+  `proguard.txt` in the AAR, so under R8 the SDK's public API and protocol classes were
+  stripped or renamed unless the merchant copied the rules from docs.khipu.com by hand,
+  and the payment ended in `ERROR` as soon as it started. `2.28.7` ships four rules that
+  R8 applies on its own; across the AAR, `proguard.txt` goes from 0 to 1035 bytes,
+  `AndroidManifest.xml` is identical and `releaseRuntimeClasspath` differs in the SDK
+  version alone. Measured on device with R8, failing on `2.28.6` and passing on `2.28.7`,
+  on both lines: see "End-to-end payments on device".
+  - **The other half of IKW-1266 never reached this bridge.** Under R8,
+    `KhipuResult.asJson()` emitted renamed keys even with the docs rules, because those
+    keep only public and protected members and the Kotlin backing fields are private.
+    `KhipuResultReader` calls `asJson()` nowhere: it builds the result from string
+    literals and public getters, which R8 leaves alone.
+  - **The README says nothing about R8.** Whether to tell merchants that R8 needs `8.1.2`
+    or `7.1.2` onwards, or the docs rules before that, is not decided.
 
 - **`khipu-client-android 2.28.6` replaces ML Kit with ZXing (IKW-1264). Published in
   `8.1.1` and `7.1.1` on 2026-10-01, before the device check this entry had set as the
