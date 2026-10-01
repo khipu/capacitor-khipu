@@ -1,8 +1,8 @@
 # Status
 
-**Last updated:** 2026-09-12 — hardening pass pushed to `7.x`, plus the iOS null-key
-alignment. Android SDK `2.28.4`, iOS SDK `2.17.1`. Verified locally and on device; not
-yet published.
+**Last updated:** 2026-10-01 — `8.1.1` and `7.1.1` published, both on Android SDK
+`2.28.6` and iOS SDK `2.17.1`. The device check of a real QR authorisation is still
+pending; see "Known pending".
 
 This is the entry point for picking up plugin work without prior context. The design
 and plan for a pass in progress are kept next to it while it is being worked, and are
@@ -224,8 +224,8 @@ single Capacitor 5 target into three lines: two maintained, one frozen.
 
 | Line | Branch        | Capacitor | iOS min | dist-tag | Version  |
 | ---- | ------------- | --------- | ------- | -------- | -------- |
-| 8.x  | `main`        | 8         | 15      | `latest` | `4.0.0`  |
-| 7.x  | `7.x`         | 7         | 14      | `cap7`   | `3.0.0`  |
+| 8.x  | `main`        | 8         | 15      | `latest` | `8.1.1`  |
+| 7.x  | `7.x`         | 7         | 14      | `cap7`   | `7.1.1`  |
 | 2.x  | `release/2.x` | 5 and 6   | 13      | `cap6`   | `2.11.3` |
 
 **Both maintained lines expose `Package.swift` and `CapacitorKhipu.podspec`**, so a
@@ -237,11 +237,19 @@ manager each line's example app demonstrates: `7.x` uses CocoaPods (Capacitor 7'
 default) and `main` uses SPM (Capacitor 8's default), so together they exercise both
 paths against real builds.
 
-All three lines are published to npm, as of 2026-09-05, with these dist-tags:
+All three lines are published to npm, as of 2026-10-01, with these dist-tags:
 
 ```
-{ latest: '4.0.0', cap6: '2.11.3', cap7: '3.0.0' }
+{ latest: '8.1.1', cap6: '2.11.3', cap7: '7.1.1' }
 ```
+
+**A version can take a couple of minutes to appear after `npm publish`.** release-it 21
+runs `npm publish` before the git commit, tag and push, and aborts if it throws, so a
+release tag on `origin` means npm accepted the upload. On 2026-10-01 `7.1.1` was
+accepted, but npmjs.com showed it as *validating* and the registry did not list it for
+about two minutes. In that window `npm view` answers `E404` and `npm pack` `ETARGET`,
+and the local npm cache keeps that answer, so query with `--prefer-online`. A missing
+version in the first minutes is not a failed publish.
 
 ## Defects fixed that reached merchants in production
 
@@ -619,10 +627,11 @@ it.
 
 ## Known pending
 
-- **`khipu-client-android 2.28.6` replaces ML Kit with ZXing (IKW-1264). Both lines are
-  on it; neither is published. Before publishing, decode a real QR authorisation on a
-  device.** The SDK now decodes the QR of a QR-type `AuthorizationRequest` with
-  `com.google.zxing:core:3.5.4` instead of ML Kit. Nothing changes for the bridge: across
+- **`khipu-client-android 2.28.6` replaces ML Kit with ZXing (IKW-1264). Published in
+  `8.1.1` and `7.1.1` on 2026-10-01, before the device check this entry had set as the
+  gate, by decision. That check is still pending.** The SDK now decodes the QR of a
+  QR-type `AuthorizationRequest` with `com.google.zxing:core:3.5.4` instead of ML Kit.
+  Nothing changes for the bridge: across
   every class in both jars, `javap -public` shows only the QR helper moving to
   `com.khipu.client.util`, and the bridge never called it. What changes is what the
   merchant's app packages. 16 artifacts leave `releaseRuntimeClasspath`, among them ML
@@ -639,12 +648,13 @@ it.
     report shows. Nothing here calls `ConnectivityManager`: not the bridge, not
     Capacitor core on either line, not the example. But a merchant whose own code does,
     without declaring the permission, worked by accident until now and gets a
-    `SecurityException` on `2.28.6`. It belongs in the release notes.
-  - **The gate.** Neither the SDK team nor this repository has decoded a real bank's QR
-    on a device; the SDK's coverage is five Robolectric tests. If ZXing cannot read a QR
-    that ML Kit could, that bank's payer is stuck, and no bridge can contain it. Whether
-    DemoBank offers a QR authorisation is unknown; ask the Android team. Then publish
-    `8.1.1` and `7.1.1`, checking the version the SDK prints in its footer.
+    `SecurityException` on `2.28.6`. The GitHub releases for `8.1.1` and `7.1.1` say so.
+  - **Still pending: a real QR on a device.** Neither the SDK team nor this repository
+    has decoded a real bank's QR on a device; the SDK's coverage is five Robolectric
+    tests. If ZXing cannot read a QR that ML Kit could, that bank's payer is stuck, and
+    no bridge can contain it. The public DemoBank test cases list no QR authorisation,
+    and whether one exists is still an open question. When the check runs, read the
+    version the SDK prints in its footer.
 
 - ~~**`khipu-client-android 2.28.4` carries a crash that kills the merchant's process.**~~
   **Fixed in `2.28.5`; both lines are on it.**
