@@ -619,6 +619,33 @@ it.
 
 ## Known pending
 
+- **`khipu-client-android 2.28.6` replaces ML Kit with ZXing (IKW-1264). Both lines are
+  on it; neither is published. Before publishing, decode a real QR authorisation on a
+  device.** The SDK now decodes the QR of a QR-type `AuthorizationRequest` with
+  `com.google.zxing:core:3.5.4` instead of ML Kit. Nothing changes for the bridge: across
+  every class in both jars, `javap -public` shows only the QR helper moving to
+  `com.khipu.client.util`, and the bridge never called it. What changes is what the
+  merchant's app packages. 16 artifacts leave `releaseRuntimeClasspath`, among them ML
+  Kit with its `libbarhopper_v3.so` (3 to 6 MB per ABI), the firebase and datatransport
+  telemetry, `kotlinx-coroutines-play-services` and `javax.inject`. Only `zxing:core`
+  enters. `play-services-base`, `-basement` and `-tasks` stay, at the same versions,
+  through `play-services-location`. The compile classpath differs in the SDK version
+  alone. Count resolved artifacts, not lines of `gradlew dependencies`: a line such as
+  `play-services-base:18.1.0 -> 18.5.0` disappears when nothing requests `18.1.0` any
+  more, while `18.5.0` itself stays. Counting lines first gave 24 and three false
+  removals.
+  - **`ACCESS_NETWORK_STATE` leaves the merged manifest.** It arrived only through
+    `datatransport:transport-backend-cct`, as the example app's manifest-merger blame
+    report shows. Nothing here calls `ConnectivityManager`: not the bridge, not
+    Capacitor core on either line, not the example. But a merchant whose own code does,
+    without declaring the permission, worked by accident until now and gets a
+    `SecurityException` on `2.28.6`. It belongs in the release notes.
+  - **The gate.** Neither the SDK team nor this repository has decoded a real bank's QR
+    on a device; the SDK's coverage is five Robolectric tests. If ZXing cannot read a QR
+    that ML Kit could, that bank's payer is stuck, and no bridge can contain it. Whether
+    DemoBank offers a QR authorisation is unknown; ask the Android team. Then publish
+    `8.1.1` and `7.1.1`, checking the version the SDK prints in its footer.
+
 - ~~**`khipu-client-android 2.28.4` carries a crash that kills the merchant's process.**~~
   **Fixed in `2.28.5`; both lines are on it.**
   `KhipuCookieJar.cache` is a plain `java.util.HashSet`, and the class contains no
