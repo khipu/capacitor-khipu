@@ -613,6 +613,15 @@ it.
 
 ## Known pending
 
+- **Remove the `overrides` entry in `package.json` once release-it ships `undici`
+  `7.29.1` or later.** release-it `21.1.0`, the latest as of 2026-10-05, pins `undici` at
+  exactly `7.29.0`, which carries six advisories fixed in `7.29.1`. With that pin
+  Dependabot cannot raise the version, and its security update runs end in
+  `security_update_not_possible`, so the override does it for release-it alone; the
+  top-level `undici` 8 is untouched. Exposure was low: release-it is a dev dependency
+  and imports `undici` only in its GitLab plugin, while this repository publishes to
+  GitHub. Upstream: release-it/release-it#1335. Both lines carry the override.
+
 - **`khipu-client-android 2.28.7` ships the SDK's R8 consumer rules (IKW-1266).
   Published in `8.1.2` and `7.1.2` on 2026-10-01.** `2.28.6` and earlier published an empty
   `proguard.txt` in the AAR, so under R8 the SDK's public API and protocol classes were
