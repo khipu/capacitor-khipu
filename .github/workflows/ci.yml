@@ -138,8 +138,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # `npm ci`, not `npm install`: an example lockfile out of step with
+      # example/package.json has to fail here, not be rewritten on the runner. After a
+      # release the lockfile's `..` entry still carries the previous plugin version, and
+      # `npm ci` does not check it: the link resolves to the plugin just built.
       - name: Install the example app
-        run: npm install
+        run: npm ci
         working-directory: example
       - name: Sync and build iOS
         run: |
