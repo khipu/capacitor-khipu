@@ -307,6 +307,15 @@ line, not once — the fix is **not cherry-pickable** between lines: `main` and 
 have different dependency trees, so each branch that touches its lockfile needs its own
 regeneration with the Node 22 npm.
 
+**A targeted change is the exception: make it with npm 11, then check it with the Node 22
+npm.** The lockfiles carry `libc` fields on the platform binaries of rollup and rolldown,
+which npm 11 writes and Dependabot keeps. Node 22's npm (10.9) drops them on any
+`npm install`: an override that moved one package came out as a 72-line lockfile diff.
+For an override or an `npm update <pkg>`, run `npx -y npm@11 install`, confirm with
+`git diff --stat` that only the intended package moved, then delete `node_modules` and
+run `npm ci` with the Node 22 npm, which is what CI does. #65 and #66 were made this way.
+A full regeneration still follows the rule above.
+
 Separately, if the iOS job's simulator destination ever becomes ambiguous: pin the
 runner's actual runtime version. `OS=latest` does not work — `xcodebuild` rejects it,
 confirmed when this was investigated.
