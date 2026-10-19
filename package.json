@@ -68,7 +68,7 @@
     "jsdom": "^30.0.1",
     "prettier": "^3.9.6",
     "prettier-plugin-java": "^2.10.3",
-    "release-it": "^21.1.0",
+    "release-it": "^21.1.1",
     "rimraf": "^6.1.3",
     "rollup": "^4.63.1",
     "swiftlint": "^2.0.0",
@@ -112,11 +112,6 @@
       "@release-it/conventional-changelog": {
         "preset": "conventionalcommits"
       }
-    }
-  },
-  "overrides": {
-    "release-it": {
-      "undici": "7.29.1"
     }
   }
 }
