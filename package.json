@@ -113,10 +113,5 @@
         "preset": "conventionalcommits"
       }
     }
-  },
-  "overrides": {
-    "release-it": {
-      "undici": "7.29.1"
-    }
   }
 }
