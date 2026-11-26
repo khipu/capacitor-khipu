@@ -118,21 +118,34 @@ export class KhipuWeb extends WebPlugin implements KhipuPlugin {
     const injectedHere = preexisting === null;
 
     return new Promise<KwsWidget>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('timed out waiting for kws.js')), KhipuWeb.LOAD_TIMEOUT_MS);
-
-      script.addEventListener('load', () => {
-        clearTimeout(timer);
+      const onLoad = () => {
+        cleanup();
         const widget = KhipuWeb.instance();
         if (widget) {
           resolve(widget);
         } else {
           reject(new Error('kws.js loaded but never defined Khipu'));
         }
-      });
-      script.addEventListener('error', () => {
-        clearTimeout(timer);
+      };
+
+      const onError = () => {
+        cleanup();
         reject(new Error('kws.js failed to load'));
-      });
+      };
+
+      const cleanup = () => {
+        clearTimeout(timer);
+        script.removeEventListener('load', onLoad);
+        script.removeEventListener('error', onError);
+      };
+
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('timed out waiting for kws.js'));
+      }, KhipuWeb.LOAD_TIMEOUT_MS);
+
+      script.addEventListener('load', onLoad);
+      script.addEventListener('error', onError);
     }).catch((error: unknown) => {
       // Do not cache a failure: a later call should be free to try again.
       this.loading = undefined;
