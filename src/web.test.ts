@@ -221,4 +221,41 @@ describe('KhipuWeb', () => {
     secondScript?.dispatchEvent(new Event('load'));
     await secondAssertion;
   });
+
+  it('removes load and error listeners from preexisting script tag after timeout and retries cleanly', async () => {
+    const preexisting = document.createElement('script');
+    preexisting.id = 'kws_script_id';
+    document.head.appendChild(preexisting);
+
+    const removeSpy = vi.spyOn(preexisting, 'removeEventListener');
+
+    const first = new KhipuWeb().startOperation({ operationId: 'a', options: {} });
+    const firstAssertion = expect(first).rejects.toThrow('timed out waiting for kws.js');
+
+    await vi.advanceTimersByTimeAsync(10_050);
+    await firstAssertion;
+
+    expect(removeSpy).toHaveBeenCalledWith('load', expect.any(Function));
+    expect(removeSpy).toHaveBeenCalledWith('error', expect.any(Function));
+
+    const second = new KhipuWeb().startOperation({ operationId: 'b', options: {} });
+    fakeWidget(calls, { result: 'OK' });
+    preexisting.dispatchEvent(new Event('load'));
+
+    await expect(second).resolves.toEqual({ result: 'OK' });
+  });
+
+  it('detaches load and error listeners after kws.js resolves', async () => {
+    const pending = new KhipuWeb().startOperation({ operationId: 'abc', options: {} });
+    const script = document.getElementById('kws_script_id');
+    expect(script).not.toBeNull();
+
+    const removeSpy = vi.spyOn(script!, 'removeEventListener');
+    fakeWidget(calls, { result: 'OK' });
+    script!.dispatchEvent(new Event('load'));
+
+    await expect(pending).resolves.toEqual({ result: 'OK' });
+    expect(removeSpy).toHaveBeenCalledWith('load', expect.any(Function));
+    expect(removeSpy).toHaveBeenCalledWith('error', expect.any(Function));
+  });
 });
